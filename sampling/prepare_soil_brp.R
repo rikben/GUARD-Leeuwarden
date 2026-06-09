@@ -184,6 +184,8 @@ process_tile <- function(tile_id, grid, brp, soil_classes) {
       soilunit_code,
       soilclassification,
       mainsoilclassification,
+      soilcharacteristics_code,
+      topsoil_description,
       soil_intersection_area_m2,
       soil_share,
       tile_id
@@ -221,14 +223,39 @@ soilarea_soilunit <- st_read(soil_gpkg, layer = "soilarea_soilunit", quiet = FAL
 soil_units <- st_read(soil_gpkg, layer = "soil_units", quiet = FALSE) |>
   st_drop_geometry()
 
+soilarea_soilunit_toplayer <- st_read(
+  soil_gpkg,
+  layer = "soilarea_soilunit_soilcharacteristicstoplayer",
+  quiet = FALSE
+) |>
+  st_drop_geometry()
+
+soilcharacteristics_toplayer <- st_read(
+  soil_gpkg,
+  layer = "soilcharacteristics_toplayer",
+  quiet = FALSE
+) |>
+  st_drop_geometry() |>
+  rename(topsoil_description = description)
+
 soil_classes <- soilarea |>
   left_join(soilarea_soilunit, by = "maparea_id") |>
   left_join(soil_units, by = c("soilunit_code" = "code")) |>
+  left_join(
+    soilarea_soilunit_toplayer,
+    by = c("maparea_id", "soilunit_sequencenumber")
+  ) |>
+  left_join(
+    soilcharacteristics_toplayer,
+    by = c("soilcharacteristics_code" = "code")
+  ) |>
   select(
     maparea_id,
     soilunit_code,
     soilclassification,
-    mainsoilclassification
+    mainsoilclassification,
+    soilcharacteristics_code,
+    topsoil_description
   )
 
 # ---- Process BRP per year ----
@@ -324,7 +351,9 @@ for (year in brp_years) {
       maparea_id,
       soilunit_code,
       soilclassification,
-      mainsoilclassification
+      mainsoilclassification,
+      soilcharacteristics_code,
+      topsoil_description
     ) |>
     summarise(
       soil_intersection_area_m2 = sum(soil_intersection_area_m2, na.rm = TRUE),
@@ -361,6 +390,8 @@ for (year in brp_years) {
       dominant_soilunit_code = soilunit_code,
       dominant_soilclassification = soilclassification,
       dominant_mainsoilclassification = mainsoilclassification,
+      dominant_soilcharacteristics_code = soilcharacteristics_code,
+      dominant_topsoil_description = topsoil_description,
       dominant_soil_share = soil_share
     )
   
