@@ -94,13 +94,11 @@ for (year in brp_years) {
   brp_url <- sprintf(brp_url_template, year)
   brp_gpkg <- file.path(out_dir, paste0("brpgewaspercelen_definitief_", year, ".gpkg"))
   
-  out_file_detail <- file.path(out_dir, paste0("brp_soil_intersections_", year, ".geojson"))
-  out_file_dominant <- file.path(out_dir, paste0("brp_dominant_soil_", year, ".geojson"))
+  out_file_composition <- file.path(out_dir, paste0("brp_soil_composition_", year, ".gpkg"))
+  out_file_dominant <- file.path(out_dir, paste0("brp_dominant_soil_", year, ".gpkg"))
   
-  # ---- Download BRP GPKG if needed ----
   download_if_missing(brp_url, brp_gpkg)
   
-  # ---- Read BRP parcels ----
   print(st_layers(brp_gpkg))
   brp_layer <- get_first_spatial_layer(brp_gpkg)
   
@@ -110,7 +108,6 @@ for (year in brp_years) {
   
   message("Number of BRP parcels read for ", year, ": ", nrow(brp))
   
-  # ---- Add robust parcel ID and parcel area ----
   brp <- brp |>
     mutate(
       brp_year = year,
@@ -118,21 +115,46 @@ for (year in brp_years) {
       parcel_area_m2 = as.numeric(st_area(brp))
     )
   
-  # ---- Spatial overlay: one parcel may intersect multiple soils ----
+  # ---- Intersect BRP with soil map ----
   brp_soil_detail <- st_intersection(brp, soil_classes) |>
     st_make_valid() |>
-    st_collection_extract("POLYGON") |>
-    st_cast("MULTIPOLYGON")
+    st_collection_extract("POLYGON")
   
-  # ---- Calculate soil area share within each parcel ----
   brp_soil_detail <- brp_soil_detail |>
     mutate(
       soil_intersection_area_m2 = as.numeric(st_area(brp_soil_detail)),
       soil_share = soil_intersection_area_m2 / parcel_area_m2
     )
   
-  # ---- Dominant soil per parcel ----
-  brp_soil_dominant <- brp_soil_detail |>
+  # ---- Save soil composition as non-spatial table in GPKG ----
+  brp_soil_composition <- brp_soil_detail |>
+    st_drop_geometry() |>
+    select(
+      parcel_id,
+      brp_year,
+      parcel_area_m2,
+      maparea_id,
+      soilunit_code,
+      soilclassification,
+      mainsoilclassification,
+      soil_intersection_area_m2,
+      soil_share
+    )
+  
+  if (file.exists(out_file_composition)) {
+    file.remove(out_file_composition)
+  }
+  
+  st_write(
+    brp_soil_composition,
+    out_file_composition,
+    layer = paste0("brp_soil_composition_", year),
+    driver = "GPKG",
+    quiet = FALSE
+  )
+  
+  # ---- Determine dominant soil per parcel ----
+  dominant_soil_table <- brp_soil_composition |>
     group_by(parcel_id) |>
     slice_max(
       order_by = soil_intersection_area_m2,
@@ -140,38 +162,33 @@ for (year in brp_years) {
       with_ties = FALSE
     ) |>
     ungroup() |>
-    mutate(
+    select(
+      parcel_id,
       dominant_soilunit_code = soilunit_code,
+      dominant_soilclassification = soilclassification,
       dominant_mainsoilclassification = mainsoilclassification,
       dominant_soil_share = soil_share
     )
   
-  # ---- Save detailed intersection output ----
-  if (file.exists(out_file_detail)) {
-    file.remove(out_file_detail)
-  }
+  # ---- Join dominant soil back to original BRP parcel geometry ----
+  brp_dominant_soil <- brp |>
+    left_join(dominant_soil_table, by = "parcel_id")
   
-  st_write(
-    brp_soil_detail,
-    out_file_detail,
-    driver = "GeoJSON",
-    quiet = FALSE
-  )
-  
-  # ---- Save dominant soil output ----
+  # ---- Save BRP parcels with dominant soil as GPKG ----
   if (file.exists(out_file_dominant)) {
     file.remove(out_file_dominant)
   }
   
   st_write(
-    brp_soil_dominant,
+    brp_dominant_soil,
     out_file_dominant,
-    driver = "GeoJSON",
+    layer = paste0("brp_dominant_soil_", year),
+    driver = "GPKG",
     quiet = FALSE
   )
   
-  message("Detailed soil intersections written to: ", out_file_detail)
-  message("Dominant soil per parcel written to: ", out_file_dominant)
-  message("Number of detailed parcel-soil features: ", nrow(brp_soil_detail))
-  message("Number of dominant parcel features: ", nrow(brp_soil_dominant))
+  message("Soil composition table written to: ", out_file_composition)
+  message("BRP parcels with dominant soil written to: ", out_file_dominant)
+  message("Number of parcel-soil combinations: ", nrow(brp_soil_composition))
+  message("Number of BRP parcels with dominant soil: ", nrow(brp_dominant_soil))
 }
