@@ -1,3 +1,10 @@
+#Switched from an AOI-based workflow to a parcel-based workflow**: instead of downloading imagery for one large area, the R script processes individual agricultural parcels.
+#Removed the tiling and mosaicking system**: the Python script split large AOIs into API-compatible tiles and merged them afterward; the R script assumes parcels are small enough to download in a single request.
+#Replaced shapefile AOIs with BRP-derived GeoJSON parcels**: the spatial units are now agricultural parcels rather than a manually defined study-area shapefile.
+#Introduced a reusable `download_sentinel(geometry)` function**: the download logic is no longer tied to a specific AOI and can work with any geometry (parcel, polygon, grid cell, etc.).
+#Changed the purpose of the pipeline**: the Python script was designed as a general Sentinel-2 scene download and processing workflow, while the R script is being structured as the foundation for parcel-level data extraction that can later feed sampling, training, and national-scale prediction workflows.
+
+
 library(sf)
 library(terra)
 library(httr2)
