@@ -172,7 +172,7 @@ process_tile <- function(tile_id, grid, brp, soil_classes) {
   detail |>
     mutate(
       tile_id = tile_id,
-      soil_intersection_area_m2 = as.numeric(st_area(geometry)),
+      soil_intersection_area_m2 = as.numeric(st_area(st_geometry(detail))),
       soil_share = soil_intersection_area_m2 / parcel_area_m2
     ) |>
     st_drop_geometry() |>
@@ -260,7 +260,7 @@ for (year in brp_years) {
     mutate(
       brp_year = year,
       parcel_id = paste0(year, "_", row_number()),
-      parcel_area_m2 = as.numeric(st_area(geometry))
+      parcel_area_m2 = as.numeric(st_area(st_geometry(brp)))
     )
   
   workers <- choose_workers()
