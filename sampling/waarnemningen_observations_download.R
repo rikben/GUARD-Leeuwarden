@@ -11,6 +11,7 @@
 #install.packages("httr2")
 
 # libraries
+#library(sf)
 #library(httr2)
 #library(jsonlite)
 
@@ -111,6 +112,7 @@ obs_2025_sf <- st_as_sf(
 )
 
 ### ACCURACY - filtering or not filtering observations ###
+### WE DECIDED NOT TO DO THIS - THE FIELD OBSERVER_LOCATION IS NA ###
 # remove sightings which were NOT moved (marker not adjusted by user) and their accuracy is worse than 25 m
 # fields to use: compare "observer_location" and "location" to see if they moved marker
 # If they differ, do not do anything (assuming they moved the marker to field correctly)
@@ -118,11 +120,31 @@ obs_2025_sf <- st_as_sf(
 # If accuracy was <= 25 m, keep this observation (if it was 26m or more, discard it)
 
 ## reproject both to RD new for later AND plot them to check if success
-st_transform(obs_2020_sf, 28992)
-st_transform(obs_2025_sf, 28992)
+obs_2020_sf <- st_transform(obs_2020_sf, 28992)
+obs_2025_sf <-  st_transform(obs_2025_sf, 28992)
 plot(st_geometry(obs_2020_sf))
 plot(st_geometry(obs_2025_sf))
 
+# create dir
+out_dir <- "data"
+year <- c("2020", "2025")
+
+# ---- Create output folder if needed ----
+if (!dir.exists(out_dir)) {
+  dir.create(out_dir, recursive = TRUE)
+}
+
+#optionally, export the final shapefiles (they will have id, accuracy, and geometry)
+write_to_gpkg <- function(shapefile, year, out_dir) {
+  st_write(
+    shapefile,
+    file.path(out_dir, paste0("obs_", year, ".gpkg")),
+    delete_dsn = TRUE
+  )
+}
+
+write_to_gpkg(obs_2020_sf, year[1], out_dir)
+write_to_gpkg(obs_2025_sf, year[2], out_dir)
 
 # NOTES FOR SELF:
 # make the logic better through a function which does all of this based on a year you give it
