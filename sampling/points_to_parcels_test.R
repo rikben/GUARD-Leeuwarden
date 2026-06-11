@@ -1,18 +1,17 @@
 library(sf)
 library(dplyr)
 
-#for now hardcoded, but its going to be called from the other R scripts later
+# assumes all files are in "data" dir, if not, we need some function here that sources those
+# from the other scripts (which are waarnemingen_obs_download.R and prepare_soil_brp.R)
 
 #reading data for parcels, points, and the spatial grid
 
-#reading data for parcels, points, and the spatial grid 
-brp_parcels_2025 <- st_read("C:/Users/dirke/projects/brp_dominant_soil_2025_simplified.gpkg") 
-brp_parcels_2020 <- st_read("C:/Users/dirke/projects/brp_dominant_soil_2020_simplified.gpkg") 
+#reading data for parcels, points, and the spatial grid
+brp_parcels_2025 <- st_read("data/brp_dominant_soil_2025_simplified.gpkg") 
+brp_parcels_2020 <- st_read("data/brp_dominant_soil_2020_simplified.gpkg") 
 
-obs_2025 <- st_read("C:/Users/dirke/projects/data/obs_2025.gpkg") 
-obs_2020 <- st_read("C:/Users/dirke/projects/data/obs_2020.gpkg") 
-
-#national_grid <- st_read("C:/Users/dirke/OneDrive/Documenten/data/nl_grid_40000m.geojson") 
+obs_2025 <- st_read("data/obs_2025.gpkg")
+obs_2020 <- st_read("data/obs_2020.gpkg") 
 
 #keep only the points which intersect with parcels 
 obs_2025_intersect <- st_filter(obs_2025, brp_parcels_2025, .predicate = st_intersects) 
