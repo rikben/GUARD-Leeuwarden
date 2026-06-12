@@ -48,7 +48,7 @@ download_images_and_prepare_data <- function(vector_file, start_date, end_date) 
   data_cube <- sits_cube_copy(
     cube,
     roi        = roi_bbox,
-    output_dir = "C:/remote_sensing_Advanced_EO/data"
+    output_dir = "data/raw-data"
   )
   
   return(data_cube)
@@ -63,7 +63,7 @@ regularize_cube <- function(satellite_images) {
     satellite_images,
     period     = "P5D",
     res        = 10,
-    output_dir = "C:/remote_sensing_Advanced_EO/regularized"
+    output_dir = "data/regularized-data"
   )
 }
 
@@ -266,11 +266,13 @@ generate_image_metadata <- function(satellite_images_reg, vector_file,
 # ═════════════════════════════════════════════
 # MAIN: Call all functions in order
 # ═════════════════════════════════════════════
-
-input_vector_file <- "C:/remote_sensing_Advanced_EO/dummyData.gpkg"
-base_img_dir      <- "C:/remote_sensing_Advanced_EO/images"
+setwd("C:\\remote_sensing_Advanced_EO\\GUARD-Leeuwarden\\downloading")
+input_vector_file <- "data/dummyData.gpkg" 
+base_img_dir      <- "images"
 start_date        <- "2020-03-23"
 end_date          <- "2020-05-07"
+
+getwd()
 
 # 1. Download
 satellite_images <- download_images_and_prepare_data(
@@ -291,7 +293,7 @@ extract_rgb_patches(satellite_images_reg, my_polygons_with_id, base_img_dir)
 # 5. Generate parcel metadata CSV
 parcel_metadata <- generate_parcel_metadata(
   input_vector_file,
-  "C:/remote_sensing_Advanced_EO/parcel_metadata.csv"
+  "metadata/parcel_metadata.csv"
 )
 
 # 6. Generate image metadata CSV
@@ -299,7 +301,7 @@ image_metadata <- generate_image_metadata(
   satellite_images_reg,
   input_vector_file,
   polygon_summary_stats,
-  "C:/remote_sensing_Advanced_EO/image_metadata.csv"
+  "metadata/image_metadata.csv"
 )
 
 cat("\nAll operations complete!\n")
