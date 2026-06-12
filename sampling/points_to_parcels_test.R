@@ -1,6 +1,24 @@
+# Script that takes all BRP parcels and links them to all Waarnemingen observations, 2020 and 2025.
+
+# Because the observers sometimes log the fields from the road (even though they
+# mostly drag the marker to middle of correct field); this script runs an intersection 
+# of glyphosate observations with parcels and only keep parcels which
+# have an observation directly on them, thus losing a few parcels for training, but
+# avoiding having to figure out which field was meant by a user who was stationary on
+# road between multiple fields.
+
+# Output: only those parcels that had an observation directly on them
+
+# Additionally, it:
+# 1) creates version of all BRP (for each year) with an added Boolean "glyphosate" 4
+# column ("1" observed, "0" not observed) used later for non-treated sampling
+# 2) Removes a proportion of the smallest parcels to avoid edge effect and small strip fields
+
+# assumes all files are in "data" dir, if not, we need some function here that sources those
+# from the other scripts (which are Waarnemingen_obs_download.R and prepare_soil_brp.R)
+
 library(sf)
 library(dplyr)
-
 
 # Setup
 out_dir <- "data"
@@ -9,12 +27,12 @@ if (!dir.exists(out_dir)) {
   dir.create(out_dir, recursive = TRUE)
 }
 
-# Read data
+#reading data for parcels, points, and the spatial grid
+brp_parcels_2025 <- st_read("data/brp_dominant_soil_2025_simplified.gpkg") 
+brp_parcels_2020 <- st_read("data/brp_dominant_soil_2020_simplified.gpkg")
+
 obs_2020 <- st_read("data/obs_2020.gpkg")
 obs_2025 <- st_read("data/obs_2025.gpkg")
-
-brp_parcels_2020 <- st_read("data/brp_dominant_soil_2020_simplified.gpkg")
-brp_parcels_2025 <- st_read("data/brp_dominant_soil_2025_simplified.gpkg")
 
 #keep only points that intersect parcels
 # (cheap operation → reduces data early)
