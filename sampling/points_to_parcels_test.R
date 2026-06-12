@@ -10,38 +10,20 @@ if (!dir.exists(out_dir)) {
 }
 
 # Read data
-brp_parcels_2025 <- st_read("data/brp_dominant_soil_2025_simplified.gpkg")
-brp_parcels_2020 <- st_read("data/brp_dominant_soil_2020_simplified.gpkg")
-
-obs_2025 <- st_read("data/obs_2025.gpkg")
 obs_2020 <- st_read("data/obs_2020.gpkg")
+obs_2025 <- st_read("data/obs_2025.gpkg")
+
+brp_parcels_2020 <- st_read("data/brp_dominant_soil_2020_simplified.gpkg")
+brp_parcels_2025 <- st_read("data/brp_dominant_soil_2025_simplified.gpkg")
 
 #keep only points that intersect parcels
 # (cheap operation → reduces data early)
-obs_2025_intersect <- st_filter(
-  obs_2025,
-  brp_parcels_2025,
-  .predicate = st_intersects
-)
-
-obs_2020_intersect <- st_filter(
-  obs_2020,
-  brp_parcels_2020,
-  .predicate = st_intersects
-)
+obs_2020_intersect <- st_filter(obs_2020, brp_parcels_2020, .predicate = st_intersects)
+obs_2025_intersect <- st_filter(obs_2025, brp_parcels_2025, .predicate = st_intersects)
 
 #keep only parcels that intersect remaining points
-parcels_2025_intersect <- st_filter(
-  brp_parcels_2025,
-  obs_2025_intersect,
-  .predicate = st_intersects
-)
-
-parcels_2020_intersect <- st_filter(
-  brp_parcels_2020,
-  obs_2020_intersect,
-  .predicate = st_intersects
-)
+parcels_2025_intersect <- st_filter(brp_parcels_2025, obs_2025, .predicate = st_intersects)
+parcels_2020_intersect <- st_filter(brp_parcels_2020, obs_2020, .predicate = st_intersects)
 
 #compute 20th percentile threshold
 # (ONLY on intersected parcels)
