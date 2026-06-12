@@ -28,15 +28,33 @@ if (!dir.exists(out_dir)) {
 }
 
 #reading data for parcels, points, and the spatial grid
+brp_parcels_2025 <- st_read("data/brp_dominant_soil_2025_simplified.gpkg")
 brp_parcels_2020 <- st_read("data/brp_dominant_soil_2020_simplified.gpkg")
-brp_parcels_2025 <- st_read("data/brp_dominant_soil_2025_simplified.gpkg") 
 
 obs_2020 <- st_read("data/obs_2020.gpkg")
 obs_2025 <- st_read("data/obs_2025.gpkg")
 
-#keep only parcels that intersect remaining points
-parcels_2020_intersect <- st_filter(brp_parcels_2020, obs_2020, .predicate = st_intersects)
-parcels_2025_intersect <- st_filter(brp_parcels_2025, obs_2025, .predicate = st_intersects)
+### TASK 1: Create version of BRP with "glyphosate" 0/1 column (for later work) ###
+# Spatial intersection: for each parcel, list matching observation indices
+idx_2020 <- st_intersects(brp_parcels_2020, obs_2020)
+idx_2025 <- st_intersects(brp_parcels_2025, obs_2025)
+
+# Create binary presence/absence flag
+brp_parcels_2020$glyphosate <- as.integer(lengths(idx_2020) > 0)
+brp_parcels_2025$glyphosate <- as.integer(lengths(idx_2025) > 0)
+#----------------------------------------------------------------------------------
+
+### TASK 2: Make a subset of brp parcels of only those that had observation ###
+parcels_2020_intersect <- brp_parcels_2020[
+  brp_parcels_2020$glyphosate == 1,
+]
+
+parcels_2025_intersect <- brp_parcels_2025[
+  brp_parcels_2025$glyphosate == 1,
+]
+#----------------------------------------------------------------------------------
+
+### TASK 3: Remove the 10% of smallest parcels to remove odd geometries and insufficiently small parcels ###
 
 #compute 10th percentile threshold
 # (ONLY on intersected parcels)
