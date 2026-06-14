@@ -6,9 +6,9 @@
 # PACKAGES #
 #install.packages("httr2")
 
-#library(sf)
-#library(httr2)
-#library(jsonlite)
+library(sf)
+library(httr2)
+library(jsonlite)
 
 
 # Call the Waarnemningen API to fetch all observations from 2020
