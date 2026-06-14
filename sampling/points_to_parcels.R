@@ -80,11 +80,11 @@ parcels_2025_final <- parcels_2025_intersect[
 
 #write outputs (parcels that had observation only for now)
 st_write(parcels_2025_final,
-         "data/parcels_2025_intersect.gpkg",
+         "data/parcels_2025_final.gpkg",
          delete_dsn = TRUE)
 
 st_write(parcels_2020_final,
-         "data/parcels_2020_intersect.gpkg",
+         "data/parcels_2020_final.gpkg",
          delete_dsn = TRUE)
 
 
