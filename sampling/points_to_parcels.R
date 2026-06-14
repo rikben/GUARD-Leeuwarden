@@ -70,28 +70,20 @@ area_threshold_2025 <- quantile(
   na.rm = TRUE
 )
 #remove smallest 10% parcels
-parcels_2020_intersect <- parcels_2020_intersect[
+parcels_2020_final <- parcels_2020_intersect[
   parcels_2020_intersect$parcel_area_m2 >= area_threshold_2020,
 ]
 
-parcels_2025_intersect <- parcels_2025_intersect[
+parcels_2025_final <- parcels_2025_intersect[
   parcels_2025_intersect$parcel_area_m2 >= area_threshold_2025,
 ]
 
-#write outputs
-st_write(obs_2025_intersect,
-         "data/obs_2025_intersect.gpkg",
-         delete_dsn = TRUE)
-
-st_write(parcels_2025_intersect,
+#write outputs (parcels that had observation only for now)
+st_write(parcels_2025_final,
          "data/parcels_2025_intersect.gpkg",
          delete_dsn = TRUE)
 
-st_write(obs_2020_intersect,
-         "data/obs_2020_intersect.gpkg",
-         delete_dsn = TRUE)
-
-st_write(parcels_2020_intersect,
+st_write(parcels_2020_final,
          "data/parcels_2020_intersect.gpkg",
          delete_dsn = TRUE)
 
@@ -105,9 +97,10 @@ analyze_parcels <- function(parcels, year) {
   cat("Number of parcels:", nrow(parcels), "\n")
   cat("Mean area (m²):", round(mean(parcels$parcel_area_m2, na.rm = TRUE), 1), "\n")
   cat("Median area (m²):", round(median(parcels$parcel_area_m2, na.rm = TRUE), 1), "\n")
-  cat("10th percentile (m²):", round(q20, 1), "\n")
+  cat("10th percentile (m²):", round(q10, 1), "\n")
   cat("Min area (m²):", min(parcels$parcel_area_m2, na.rm = TRUE), "\n")
   
+  # plot
   hist(
     parcels$parcel_area_m2,
     breaks = 50,
@@ -119,7 +112,7 @@ analyze_parcels <- function(parcels, year) {
 }
 
 # run analysis
-q10_2020 <- analyze_parcels(parcels_2020_intersect, 2020)
-q10_2025 <- analyze_parcels(parcels_2025_intersect, 2025)
+q10_2020 <- analyze_parcels(parcels_2020_final, 2020)
+q10_2025 <- analyze_parcels(parcels_2025_final, 2025)
 
 
