@@ -1,18 +1,11 @@
 ### Script that will link to Waarnemingen.nl observations using an API and
 # it will retrieve all observations from defined time period (spring of 2020, 2025).
 # It will then extract geo information from them to make true points, and
-# those will later be linked to specific parcels in pairing_parcels script. Because 
-# the observers sometimes log the fields from the road (even though they drag the marker
-# 9/10 times to middle of correct field); we will in the pairing_parcels script make sure
-# to run an intersection of those observations with parcels and only keep parcels which
-# have an observation directly on them, thus losing a few parcels for training, but removing
-# avoiding having to figure out which field was mean by a user who was stationary on
-# field between multiple roads.
+# those will later be linked to specific parcels in pairing_parcels script.
 
-# installing packages
+# PACKAGES #
 #install.packages("httr2")
 
-# libraries
 #library(sf)
 #library(httr2)
 #library(jsonlite)
@@ -112,14 +105,6 @@ obs_2025_sf <- st_as_sf(
   coords = c("lon", "lat"),
   crs = 4326
 )
-
-### ACCURACY - filtering or not filtering observations ###
-### WE DECIDED NOT TO DO THIS - THE FIELD OBSERVER_LOCATION IS NA ###
-# remove sightings which were NOT moved (marker not adjusted by user) and their accuracy is worse than 25 m
-# fields to use: compare "observer_location" and "location" to see if they moved marker
-# If they differ, do not do anything (assuming they moved the marker to field correctly)
-# If they are the same, proceed to field "accuracy"
-# If accuracy was <= 25 m, keep this observation (if it was 26m or more, discard it)
 
 ## reproject both to RD new for later AND plot them to check if success
 obs_2020_sf <- st_transform(obs_2020_sf, 28992)
