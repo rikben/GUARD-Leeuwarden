@@ -2,14 +2,13 @@
 
 # Because the observers sometimes log the fields from the road (even though they
 # mostly drag the marker to middle of correct field); this script runs an intersection 
-# of glyphosate observations with parcels and only keep parcels which
-# have an observation directly on them, thus losing a few parcels for training, but
-# avoiding having to figure out which field was meant by a user who was stationary on
-# road between multiple fields.
+# of glyphosate observations with parcels and only keep parcels which have an observation directly 
+# on them, thus losing a few parcels for training, but avoiding having to figure out which 
+# field was meant by a user who was stationary on road between multiple fields.
 
 # Output: 
-# 1) GPKG with only those parcels that had an observation (intersect) directly on them (e.g. "parcels_2020_observations"), also filtered by area (smallest 10% out) 
-# 2) new GPKG version of all BRP parcels with added glyphosate 0/1 column
+# 1) GPKG with only those parcels that had an observation (intersect) directly on them (named as "parcels_2020_observations"), also filtered by area (smallest 10% out) 
+# 2) new GPKG version of all BRP parcels with added glyphosate 0/1 column (named as "brp_parcels_2020")
 
 # assumes all parcels and observations files are in "data" dir, if not, we need some function here that sources those
 # from the other scripts (which are Waarnemingen_obs_download.R and prepare_soil_brp.R)
