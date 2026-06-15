@@ -17,14 +17,40 @@ build_band <- function(paths) {
   return(terra::mosaic(terra::sprc(rast_list)))
 }
 
-suggest_label <- function(ndvi_mean) {
-  dplyr::case_when(
-    is.na(ndvi_mean) ~ "no_data",
-    ndvi_mean > 0.7  ~ "green",
-    ndvi_mean > 0.6  ~ "slightly_yellow",
-    ndvi_mean > 0.3  ~ "yellow",
-    TRUE             ~ "ploughed"
-  )
+# Returns a single-layer raster matching `raster_template`'s grid:
+# 1 where a pixel is (almost) entirely within poly_single, NA elsewhere.
+get_full_pixel_mask <- function(raster_template, poly_single, threshold = 0.999) {
+  cov_frac  <- terra::rasterize(poly_single, raster_template, cover = TRUE)
+  full_mask <- terra::ifel(cov_frac >= threshold, 1, NA)
+  return(full_mask)
+}
+
+# Combines the full-pixel-coverage mask with a cloud-free (SCL) mask.
+# raster_template: an already-cropped raster defining the target grid/extent.
+# cloud_raster: the full-scene SCL raster (NOT yet cropped), or NULL if unavailable.
+get_combined_mask <- function(raster_template, poly_single, cloud_raster = NULL,
+                              scl_clear_values = c(4, 5, 6, 7)) {
+  full_mask <- get_full_pixel_mask(raster_template, poly_single)
+  
+  if (!is.null(cloud_raster)) {
+    cloud_cropped <- terra::crop(cloud_raster, poly_single)
+    cloud_cropped <- terra::resample(cloud_cropped, raster_template, method = "near")
+    
+    is_clear   <- Reduce(`|`, lapply(scl_clear_values, function(v) cloud_cropped == v))
+    clear_mask <- terra::ifel(is_clear, 1, NA)
+    
+    combined_mask <- full_mask * clear_mask
+  } else {
+    combined_mask <- full_mask
+  }
+  
+  return(combined_mask)
+}
+
+# Mean/SD that don't blow up (return NaN) when there are zero valid pixels
+safe_mean_sd <- function(vals) {
+  if (length(vals) == 0) return(list(mean = NA_real_, sd = NA_real_))
+  list(mean = mean(vals), sd = sd(vals))
 }
 
 # ─────────────────────────────────────────────
@@ -40,7 +66,7 @@ download_images_and_prepare_data <- function(vector_file, start_date, end_date) 
     source     = "AWS",
     collection = "SENTINEL-2-L2A",
     roi        = roi_bbox,
-    bands      = c("B02", "B03", "B04", "B05", "B08"),
+    bands      = c("B02", "B03", "B04", "B05", "B08", "CLOUD"),  # CLOUD = SCL mask
     start_date = start_date,
     end_date   = end_date
   )
@@ -69,41 +95,96 @@ regularize_cube <- function(satellite_images) {
 
 # ─────────────────────────────────────────────
 # FUNCTION 3: Compute per-polygon band statistics
+#   - only pixels entirely within the polygon
+#   - only pixels classified as "clear" by the SCL cloud mask
 # ─────────────────────────────────────────────
 
-compute_polygon_stats <- function(satellite_images_reg, my_polygons) {
-  polygon_time_series <- sits_get_data(
-    cube    = satellite_images_reg,
-    samples = my_polygons
-  )
+compute_polygon_stats <- function(satellite_images_reg, my_polygons,
+                                  scl_clear_values = c(4, 5, 6, 7)) {
+  cube_files   <- dplyr::bind_rows(satellite_images_reg$file_info)
+  unique_dates <- as.character(unique(cube_files$date))
+  bands_of_interest <- c("B02", "B03", "B04", "B05", "B08")
   
-  flat_time_series <- polygon_time_series %>%
-    tidyr::unnest(cols = time_series)
+  cat("Bands available in cube_files:", paste(unique(cube_files$band), collapse = ", "), "\n")
   
-  polygon_summary_stats <- flat_time_series %>%
-    group_by(polygon_id, Index) %>%
-    summarise(
-      B02_mean = mean(B02, na.rm = TRUE), B02_sd = sd(B02, na.rm = TRUE),
-      B03_mean = mean(B03, na.rm = TRUE), B03_sd = sd(B03, na.rm = TRUE),
-      B04_mean = mean(B04, na.rm = TRUE), B04_sd = sd(B04, na.rm = TRUE),
-      B05_mean = mean(B05, na.rm = TRUE), B05_sd = sd(B05, na.rm = TRUE),
-      B08_mean = mean(B08, na.rm = TRUE), B08_sd = sd(B08, na.rm = TRUE),
-      .groups = "drop"
-    )
+  my_polygons_ids  <- my_polygons %>% mutate(polygon_id = row_number())
+  my_polygons_spat <- terra::vect(my_polygons_ids)
   
+  stats_records  <- list()
+  record_counter <- 1
+  
+  for (dt in unique_dates) {
+    cat("Computing band statistics for date:", dt, "...\n")
+    
+    band_rasters <- list()
+    for (b in bands_of_interest) {
+      paths <- cube_files %>% filter(as.character(date) == dt, band == b) %>% pull(path)
+      band_rasters[[b]] <- build_band(paths)
+    }
+    
+    if (any(sapply(band_rasters, is.null))) {
+      cat("  -> Skipping date", dt, "- missing one or more spectral bands\n")
+      next
+    }
+    
+    cloud_paths  <- cube_files %>% filter(as.character(date) == dt, band == "CLOUD") %>% pull(path)
+    cloud_raster <- if (length(cloud_paths) > 0) build_band(cloud_paths) else NULL
+    
+    poly_proj <- terra::project(my_polygons_spat, terra::crs(band_rasters[[1]]))
+    
+    for (i in 1:nrow(poly_proj)) {
+      poly_single <- poly_proj[i, ]
+      pid         <- poly_single$polygon_id
+      
+      row_result <- tryCatch({
+        ref_cropped <- terra::crop(band_rasters[[1]], poly_single)
+        combined_mask <- get_combined_mask(ref_cropped, poly_single, cloud_raster, scl_clear_values)
+        
+        band_stats <- list()
+        for (b in bands_of_interest) {
+          band_cropped <- terra::crop(band_rasters[[b]], poly_single)
+          band_masked  <- terra::mask(band_cropped, combined_mask)
+          vals <- terra::values(band_masked, na.rm = TRUE)
+          
+          ms <- safe_mean_sd(vals)
+          band_stats[[paste0(b, "_mean")]] <- ms$mean
+          band_stats[[paste0(b, "_sd")]]   <- ms$sd
+        }
+        
+        as.data.frame(c(
+          list(polygon_id = pid, Index = dt),
+          band_stats
+        ))
+        
+      }, error = function(e) {
+        cat("  -> Polygon", pid, "skipped on", dt, ":", conditionMessage(e), "\n")
+        NULL
+      })
+      
+      if (!is.null(row_result)) {
+        stats_records[[record_counter]] <- row_result
+        record_counter <- record_counter + 1
+      }
+    }
+  }
+  
+  polygon_summary_stats <- dplyr::bind_rows(stats_records)
   return(polygon_summary_stats)
 }
 
 # ─────────────────────────────────────────────
 # FUNCTION 4: Extract and save RGB image patches per polygon per date
+#   - only pixels entirely within the polygon
+#   - only pixels classified as "clear" by the SCL cloud mask
 # ─────────────────────────────────────────────
 
-extract_rgb_patches <- function(satellite_images_reg, my_polygons, base_img_dir) {
+extract_rgb_patches <- function(satellite_images_reg, my_polygons, base_img_dir,
+                                scl_clear_values = c(4, 5, 6, 7)) {
   if (!dir.exists(base_img_dir)) dir.create(base_img_dir, recursive = TRUE)
   
-  cube_files      <- dplyr::bind_rows(satellite_images_reg$file_info)
+  cube_files       <- dplyr::bind_rows(satellite_images_reg$file_info)
   my_polygons_spat <- terra::vect(my_polygons)
-  unique_dates    <- unique(cube_files$date)
+  unique_dates     <- unique(cube_files$date)
   
   cat("Total file entries across all tiles:", nrow(cube_files), "\n")
   cat("Unique tiles:", length(satellite_images_reg$file_info), "\n")
@@ -125,6 +206,10 @@ extract_rgb_patches <- function(satellite_images_reg, my_polygons, base_img_dir)
       scene_RGB <- c(build_band(paths_R), build_band(paths_G), build_band(paths_B))
       names(scene_RGB) <- c("Red", "Green", "Blue")
       
+      # Cloud mask for this date
+      cloud_paths  <- cube_files %>% filter(as.character(date) == dt, band == "CLOUD") %>% pull(path)
+      cloud_raster <- if (length(cloud_paths) > 0) build_band(cloud_paths) else NULL
+      
       poly_spat_proj <- terra::project(my_polygons_spat, terra::crs(scene_RGB))
       
       for (i in 1:nrow(poly_spat_proj)) {
@@ -138,8 +223,10 @@ extract_rgb_patches <- function(satellite_images_reg, my_polygons, base_img_dir)
         out_png  <- file.path(plot_dir, paste0("RGB_", dt, ".png"))
         
         tryCatch({
-          plot_cropped    <- terra::crop(scene_RGB, poly_single)
-          plot_RGB        <- terra::mask(plot_cropped, poly_single)
+          plot_cropped  <- terra::crop(scene_RGB, poly_single)
+          combined_mask <- get_combined_mask(plot_cropped, poly_single, cloud_raster, scl_clear_values)
+          plot_RGB      <- terra::mask(plot_cropped, combined_mask)
+          
           terra::writeRaster(plot_RGB, out_tiff, overwrite = TRUE)
           
           plot_png_scaled <- terra::clamp(plot_RGB, 0, 3000)
@@ -188,10 +275,13 @@ generate_parcel_metadata <- function(vector_file, output_path) {
 
 # ─────────────────────────────────────────────
 # FUNCTION 6: Generate image metadata CSV with NDVI and band stats
+#   - NDVI computed only from pixels entirely within the polygon
+#   - NDVI computed only from cloud-free pixels (SCL mask)
 # ─────────────────────────────────────────────
 
 generate_image_metadata <- function(satellite_images_reg, vector_file,
-                                    polygon_summary_stats, output_path) {
+                                    polygon_summary_stats, output_path,
+                                    scl_clear_values = c(4, 5, 6, 7)) {
   cube_files   <- dplyr::bind_rows(satellite_images_reg$file_info)
   unique_dates <- as.character(unique(cube_files$date))
   
@@ -214,18 +304,38 @@ generate_image_metadata <- function(satellite_images_reg, vector_file,
     ndvi_scene <- (build_band(paths_NIR) - build_band(paths_RED)) /
       (build_band(paths_NIR) + build_band(paths_RED))
     
+    # Cloud mask for this date
+    cloud_paths  <- cube_files %>% filter(as.character(date) == dt, band == "CLOUD") %>% pull(path)
+    cloud_raster <- if (length(cloud_paths) > 0) build_band(cloud_paths) else NULL
+    
     poly_proj <- terra::project(my_polygons_spat, terra::crs(ndvi_scene))
     
     for (i in 1:nrow(poly_proj)) {
       poly_single <- poly_proj[i, ]
       pid         <- poly_single$parcel_id
       
-      ndvi_vals <- tryCatch({
-        cropped <- terra::crop(ndvi_scene, poly_single)
-        masked  <- terra::mask(cropped, poly_single)
-        vals    <- terra::values(masked, na.rm = TRUE)
-        list(mean = mean(vals), sd = sd(vals))
-      }, error = function(e) list(mean = NA_real_, sd = NA_real_))
+      result <- tryCatch({
+        cropped       <- terra::crop(ndvi_scene, poly_single)
+        combined_mask <- get_combined_mask(cropped, poly_single, cloud_raster, scl_clear_values)
+        masked        <- terra::mask(cropped, combined_mask)
+        vals          <- terra::values(masked, na.rm = TRUE)
+        
+        c(safe_mean_sd(vals), list(n_valid = length(vals)))
+      }, error = function(e) list(mean = NA_real_, sd = NA_real_, n_valid = 0))
+      
+      ndvi_vals <- list(mean = result$mean, sd = result$sd)
+      
+      # Suggested class label based on NDVI thresholds
+      suggested_label <- dplyr::case_when(
+        is.na(ndvi_vals$mean) ~ "no_data",
+        ndvi_vals$mean > 0.7  ~ "green",
+        ndvi_vals$mean > 0.6  ~ "slightly_yellow",
+        ndvi_vals$mean > 0.3  ~ "yellow",
+        TRUE                  ~ "ploughed"
+      )
+      
+      # Mark as discarded if no valid (fully-covered, cloud-free) pixels exist
+      discarded_flag <- if (result$n_valid == 0) "yes" else NA_character_
       
       image_records[[image_id_counter]] <- data.frame(
         image_id              = paste0("IMG_", sprintf("%05d", image_id_counter)),
@@ -235,9 +345,9 @@ generate_image_metadata <- function(satellite_images_reg, vector_file,
                                           paste0("RGB_", dt, ".tif")),
         ndvi_mean             = round(ndvi_vals$mean, 4),
         ndvi_sd               = round(ndvi_vals$sd,   4),
-        suggested_class_label = suggest_label(ndvi_vals$mean),
+        suggested_class_label = suggested_label,
         class_label           = NA_character_,
-        discarded             = NA_character_,
+        discarded             = discarded_flag,
         stringsAsFactors      = FALSE
       )
       image_id_counter <- image_id_counter + 1
@@ -247,7 +357,6 @@ generate_image_metadata <- function(satellite_images_reg, vector_file,
   
   image_metadata <- dplyr::bind_rows(image_records)
   
-  # Merge with polygon band summary stats
   poly_stats_renamed <- polygon_summary_stats %>%
     rename(image_date = Index,
            parcel_id  = polygon_id) %>%
@@ -272,9 +381,7 @@ base_img_dir      <- "images"
 start_date        <- "2020-03-23"
 end_date          <- "2020-05-07"
 
-getwd()
-
-# 1. Download
+# 1. Download (includes CLOUD/SCL band)
 satellite_images <- download_images_and_prepare_data(
   input_vector_file, start_date, end_date
 )
