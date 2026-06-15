@@ -17,7 +17,7 @@ library(sf)
 library(dplyr)
 
 #user input
-year <- 2025
+years <- c(2020, 2025)
 
 # Setup
 out_dir <- "data"
@@ -81,8 +81,9 @@ run_pipeline <- function(year) {
   st_write(parcels_final, paths$out_full_parcels, delete_dsn = TRUE)
   
 }
-
+for (year in years) {
 run_pipeline(year)
+}
 
 
 
