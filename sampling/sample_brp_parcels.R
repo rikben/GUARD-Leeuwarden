@@ -32,7 +32,7 @@ if (!dir.exists(out_dir)) {
 
 # ---- Check parcel files ----
 
-parcel_files <- file.path(data_dir, paste0("brp_parcels_", years, ".gpkg"))
+parcel_files <- file.path(data_dir, paste0("brp_parcels_", years, "_filtered.gpkg"))
 
 missing_files <- parcel_files[!file.exists(parcel_files)]
 
