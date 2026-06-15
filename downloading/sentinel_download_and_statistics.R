@@ -71,10 +71,13 @@ download_images_and_prepare_data <- function(vector_file, start_date, end_date) 
     end_date   = end_date
   )
   
+  raw_data_dir <- "data/raw-data"
+  if (!dir.exists(raw_data_dir)) dir.create(raw_data_dir, recursive = TRUE)
+  
   data_cube <- sits_cube_copy(
     cube,
     roi        = roi_bbox,
-    output_dir = "data/raw-data"
+    output_dir = raw_data_dir
   )
   
   return(data_cube)
@@ -85,11 +88,14 @@ download_images_and_prepare_data <- function(vector_file, start_date, end_date) 
 # ─────────────────────────────────────────────
 
 regularize_cube <- function(satellite_images) {
+  reg_data_dir <- "data/regularized-data"
+  if (!dir.exists(reg_data_dir)) dir.create(reg_data_dir, recursive = TRUE)
+  
   sits_regularize(
     satellite_images,
     period     = "P5D",
     res        = 10,
-    output_dir = "data/regularized-data"
+    output_dir = reg_data_dir
   )
 }
 
@@ -251,6 +257,9 @@ extract_rgb_patches <- function(satellite_images_reg, my_polygons, base_img_dir,
 # ─────────────────────────────────────────────
 
 generate_parcel_metadata <- function(vector_file, output_path) {
+  output_dir <- dirname(output_path)
+  if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+  
   my_polygons_meta <- st_read(vector_file) %>%
     st_drop_geometry() %>%
     mutate(feature_id = row_number())
@@ -275,13 +284,14 @@ generate_parcel_metadata <- function(vector_file, output_path) {
 
 # ─────────────────────────────────────────────
 # FUNCTION 6: Generate image metadata CSV with NDVI and band stats
-#   - NDVI computed only from pixels entirely within the polygon
-#   - NDVI computed only from cloud-free pixels (SCL mask)
 # ─────────────────────────────────────────────
 
 generate_image_metadata <- function(satellite_images_reg, vector_file,
                                     polygon_summary_stats, output_path,
                                     scl_clear_values = c(4, 5, 6, 7)) {
+  output_dir <- dirname(output_path)
+  if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+  
   cube_files   <- dplyr::bind_rows(satellite_images_reg$file_info)
   unique_dates <- as.character(unique(cube_files$date))
   
@@ -373,85 +383,58 @@ generate_image_metadata <- function(satellite_images_reg, vector_file,
 }
 
 # ═════════════════════════════════════════════
-# MAIN: Call all functions in order for 2020
-# ═════════════════════════════════════════════
-input_vector_file <- "data/dummyData.gpkg" 
-base_img_dir      <- "images_2020"
-start_date        <- "2020-03-23"
-end_date          <- "2020-05-07"
-
-# 1. Download (includes CLOUD/SCL band)
-satellite_images <- download_images_and_prepare_data(
-  input_vector_file, start_date, end_date
-)
-
-# 2. Regularize
-satellite_images_reg <- regularize_cube(satellite_images)
-
-# 3. Read polygons and compute band statistics
-my_polygons          <- st_read(input_vector_file)
-polygon_summary_stats <- compute_polygon_stats(satellite_images_reg, my_polygons)
-
-# 4. Extract RGB image patches
-my_polygons_with_id <- st_read(input_vector_file) %>% mutate(polygon_id = row_number())
-extract_rgb_patches(satellite_images_reg, my_polygons_with_id, base_img_dir)
-
-# 5. Generate parcel metadata CSV
-parcel_metadata <- generate_parcel_metadata(
-  input_vector_file,
-  "metadata/parcel_metadata2020.csv"
-)
-
-# 6. Generate image metadata CSV
-image_metadata <- generate_image_metadata(
-  satellite_images_reg,
-  input_vector_file,
-  polygon_summary_stats,
-  "metadata/image_metadata2020.csv"
-)
-
-cat("\nAll 2020 operations complete!\n")
-
-
-
-
-# ═════════════════════════════════════════════
-# MAIN: Call all functions in order for 2025
+# MAIN: Call all functions in order for each year
 # ═════════════════════════════════════════════
 
-input_vector_file <- "data/dummyData.gpkg" 
-base_img_dir      <- "images_2025"
-start_date        <- "2025-03-23"
-end_date          <- "2025-05-07"
+years    <- c(2020, 2025)
+data_dir <- "../sampling/samples"
 
-# 1. Download (includes CLOUD/SCL band)
-satellite_images <- download_images_and_prepare_data(
-  input_vector_file, start_date, end_date
-)
+parcel_files <- file.path(data_dir, paste0("sampled_parcels_", years, ".gpkg"))
 
-# 2. Regularize
-satellite_images_reg <- regularize_cube(satellite_images)
+start_dates <- paste0(years, "-03-23")
+end_dates   <- paste0(years, "-05-07")
 
-# 3. Read polygons and compute band statistics
-my_polygons          <- st_read(input_vector_file)
-polygon_summary_stats <- compute_polygon_stats(satellite_images_reg, my_polygons)
+for (idx in seq_along(years)) {
+  yr <- years[idx]
+  
+  input_vector_file <- parcel_files[idx]
+  base_img_dir      <- paste0("images_", yr)
+  start_date        <- start_dates[idx]
+  end_date          <- end_dates[idx]
+  
+  cat("\n===== Starting pipeline for year", yr, "=====\n")
+  
+  # 1. Download (includes CLOUD/SCL band)
+  satellite_images <- download_images_and_prepare_data(
+    input_vector_file, start_date, end_date
+  )
+  
+  # 2. Regularize
+  satellite_images_reg <- regularize_cube(satellite_images)
+  
+  # 3. Read polygons and compute band statistics
+  my_polygons           <- st_read(input_vector_file)
+  polygon_summary_stats <- compute_polygon_stats(satellite_images_reg, my_polygons)
+  
+  # 4. Extract RGB image patches
+  my_polygons_with_id <- st_read(input_vector_file) %>% mutate(polygon_id = row_number())
+  extract_rgb_patches(satellite_images_reg, my_polygons_with_id, base_img_dir)
+  
+  # 5. Generate parcel metadata CSV
+  parcel_metadata <- generate_parcel_metadata(
+    input_vector_file,
+    file.path("metadata", paste0("parcel_metadata", yr, ".csv"))
+  )
+  
+  # 6. Generate image metadata CSV
+  image_metadata <- generate_image_metadata(
+    satellite_images_reg,
+    input_vector_file,
+    polygon_summary_stats,
+    file.path("metadata", paste0("image_metadata", yr, ".csv"))
+  )
+  
+  cat("\nAll", yr, "operations complete!\n")
+}
 
-# 4. Extract RGB image patches
-my_polygons_with_id <- st_read(input_vector_file) %>% mutate(polygon_id = row_number())
-extract_rgb_patches(satellite_images_reg, my_polygons_with_id, base_img_dir)
-
-# 5. Generate parcel metadata CSV
-parcel_metadata <- generate_parcel_metadata(
-  input_vector_file,
-  "metadata/parcel_metadata2025.csv"
-)
-
-# 6. Generate image metadata CSV
-image_metadata <- generate_image_metadata(
-  satellite_images_reg,
-  input_vector_file,
-  polygon_summary_stats,
-  "metadata/image_metadata2025.csv"
-)
-
-cat("\nAll 2025 operations complete!\n")
+cat("\n===== All years complete! =====\n")
