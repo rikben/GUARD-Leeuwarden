@@ -42,6 +42,15 @@ idx_2025 <- st_intersects(brp_parcels_2025, obs_2025)
 # Create binary presence/absence flag
 brp_parcels_2020$glyphosate <- as.integer(lengths(idx_2020) > 0)
 brp_parcels_2025$glyphosate <- as.integer(lengths(idx_2025) > 0)
+
+# writing output of BRP parcels, now WITH glyphosate column
+st_write(brp_parcels_2020,
+         "data/brp_parcels_2020.gpkg",
+         delete_dsn = TRUE)
+
+st_write(brp_parcels_2025,
+         "data/brp_parcels_2025.gpkg",
+         delete_dsn = TRUE)
 #----------------------------------------------------------------------------------
 
 ### TASK 2: Make a subset of brp parcels of only those that had observation ###
@@ -78,7 +87,7 @@ parcels_2025_final <- parcels_2025_intersect[
   parcels_2025_intersect$parcel_area_m2 >= area_threshold_2025,
 ]
 
-#write outputs (parcels that had observation only for now)
+#write outputs (parcels that had observation)
 st_write(parcels_2025_final,
          "data/parcels_2025_final.gpkg",
          delete_dsn = TRUE)
