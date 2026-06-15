@@ -16,6 +16,9 @@
 library(sf)
 library(dplyr)
 
+#user input
+year <- 2020
+
 # Setup
 out_dir <- "data"
 
@@ -23,101 +26,55 @@ if (!dir.exists(out_dir)) {
   dir.create(out_dir, recursive = TRUE)
 }
 
-#reading data for parcels, points, and the spatial grid
-brp_parcels_2025 <- st_read("data/brp_dominant_soil_2025_simplified.gpkg")
-brp_parcels_2020 <- st_read("data/brp_dominant_soil_2020_simplified.gpkg")
-
-obs_2020 <- st_read("data/obs_2020.gpkg")
-obs_2025 <- st_read("data/obs_2025.gpkg")
-
-### TASK 1: Create version of BRP with "glyphosate" 0/1 column (for later work) ###
-# Spatial intersection: for each parcel, list matching observation indices
-idx_2020 <- st_intersects(brp_parcels_2020, obs_2020)
-idx_2025 <- st_intersects(brp_parcels_2025, obs_2025)
-
-# Create binary presence/absence flag
-brp_parcels_2020$glyphosate <- as.integer(lengths(idx_2020) > 0)
-brp_parcels_2025$glyphosate <- as.integer(lengths(idx_2025) > 0)
-
-# writing output of BRP parcels, now WITH glyphosate column
-st_write(brp_parcels_2020,
-         "data/brp_parcels_2020.gpkg",
-         delete_dsn = TRUE)
-
-st_write(brp_parcels_2025,
-         "data/brp_parcels_2025.gpkg",
-         delete_dsn = TRUE)
-#----------------------------------------------------------------------------------
-
-### TASK 2: Make a subset of brp parcels of only those that had observation ###
-parcels_2020_intersect <- brp_parcels_2020[
-  brp_parcels_2020$glyphosate == 1,
-]
-
-parcels_2025_intersect <- brp_parcels_2025[
-  brp_parcels_2025$glyphosate == 1,
-]
-#----------------------------------------------------------------------------------
-
-### TASK 3: Remove the 10% of smallest parcels to remove odd geometries and insufficiently small parcels ###
-
-#compute 10th percentile threshold
-# (ONLY on intersected parcels)
-area_threshold_2020 <- quantile(
-  parcels_2020_intersect$parcel_area_m2,
-  probs = 0.10,
-  na.rm = TRUE
-)
-
-area_threshold_2025 <- quantile(
-  parcels_2025_intersect$parcel_area_m2,
-  probs = 0.10,
-  na.rm = TRUE
-)
-#remove smallest 10% parcels
-parcels_2020_observations <- parcels_2020_intersect[
-  parcels_2020_intersect$parcel_area_m2 >= area_threshold_2020,
-]
-
-parcels_2025_observations <- parcels_2025_intersect[
-  parcels_2025_intersect$parcel_area_m2 >= area_threshold_2025,
-]
-
-#write outputs (parcels that had observation)
-st_write(parcels_2025_observations,
-         "data/parcels_2025_observations.gpkg",
-         delete_dsn = TRUE)
-
-st_write(parcels_2020_observations,
-         "data/parcels_2020_observations.gpkg",
-         delete_dsn = TRUE)
-
-
-#analysis function
-analyze_parcels <- function(parcels, year) {
-  
-  q10 <- quantile(parcels$parcel_area_m2, 0.10, na.rm = TRUE)
-  
-  cat("\n---", year, "---\n")
-  cat("Number of parcels:", nrow(parcels), "\n")
-  cat("Mean area (m²):", round(mean(parcels$parcel_area_m2, na.rm = TRUE), 1), "\n")
-  cat("Median area (m²):", round(median(parcels$parcel_area_m2, na.rm = TRUE), 1), "\n")
-  cat("10th percentile (m²):", round(q10, 1), "\n")
-  cat("Min area (m²):", min(parcels$parcel_area_m2, na.rm = TRUE), "\n")
-  
-  # plot
-  hist(
-    parcels$parcel_area_m2,
-    breaks = 50,
-    main = paste("Parcel area distribution", year),
-    xlab = "Area (m²)"
+#function to call file paths
+get_paths <- function(year) {
+  list(
+    parcels = paste0("data/brp_dominant_soil_", year, "_simplified.gpkg"),
+    obs     = paste0("data/obs_", year, ".gpkg"),
+    
+    out_full_parcels = paste0("data/brp_parcels_", year, "_filtered.gpkg"),
+    
+    out_parcels = paste0("data/parcels_", year, "_intersect.gpkg"),
+    out_obs     = paste0("data/obs_", year, "_intersect.gpkg")
   )
-  
-  return(q10)
 }
 
-# run analysis
-q10_2020 <- analyze_parcels(parcels_2020_observations, 2020)
-q10_2025 <- analyze_parcels(parcels_2025_observations, 2025)
+#main pipeline function
+run_pipeline <- function(year) {
+  
+  paths <- get_paths(year)
+  
+  # Load data 
+  parcels <- st_read(paths$parcels, quiet = TRUE)
+  obs     <- st_read(paths$obs, quiet = TRUE)
+  
+  #task 1
+  idx <- st_intersects(parcels, obs)
+  
+  parcels$glyphosate <- as.integer(lengths(idx) > 0)
+  
+  parcels_g <- parcels[parcels$glyphosate == 1, ]
+  parcels_n <- parcels[parcels$glyphosate == 0, ]
+  
+  thr_g <- quantile(parcels_g$parcel_area_m2, 0.10, na.rm = TRUE)
+  thr_n <- quantile(parcels_n$parcel_area_m2, 0.10, na.rm = TRUE)
+  
+  parcels_g_f <- parcels_g[parcels_g$parcel_area_m2 >= thr_g, ]
+  parcels_n_f <- parcels_n[parcels_n$parcel_area_m2 >= thr_n, ]
+  
+  parcels_final <- rbind(parcels_g_f, parcels_n_f)
+  
+  if (file.exists(paths$out_parcels)) {
+    file.remove(paths$out_parcels)
+  }
+  
+  
+  st_write(parcels_final, paths$out_full_parcels, delete_dsn = TRUE)
+  
+}
+
+run_pipeline(year)
+
+
 
 
