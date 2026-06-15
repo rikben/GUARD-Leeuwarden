@@ -2,19 +2,15 @@
 
 # Because the observers sometimes log the fields from the road (even though they
 # mostly drag the marker to middle of correct field); this script runs an intersection 
-# of glyphosate observations with parcels and only keep parcels which
-# have an observation directly on them, thus losing a few parcels for training, but
-# avoiding having to figure out which field was meant by a user who was stationary on
-# road between multiple fields.
+# of glyphosate observations with parcels and only keep parcels which have an observation directly 
+# on them, thus losing a few parcels for training, but avoiding having to figure out which 
+# field was meant by a user who was stationary on road between multiple fields.
 
-# Output: only those parcels that had an observation directly on them
+# Output: 
+# 1) GPKG with only those parcels that had an observation (intersect) directly on them (named as "parcels_2020_observations"), also filtered by area (smallest 10% out) 
+# 2) new GPKG version of all BRP parcels with added glyphosate 0/1 column (named as "brp_parcels_2020")
 
-# Additionally, it:
-# 1) creates version of all BRP (for each year) with an added Boolean "glyphosate" 4
-# column ("1" observed, "0" not observed) used later for non-treated sampling
-# 2) Removes a proportion of the smallest parcels to avoid edge effect and small strip fields
-
-# assumes all files are in "data" dir, if not, we need some function here that sources those
+# assumes all parcels and observations files are in "data" dir, if not, we need some function here that sources those
 # from the other scripts (which are Waarnemingen_obs_download.R and prepare_soil_brp.R)
 
 library(sf)
@@ -79,21 +75,21 @@ area_threshold_2025 <- quantile(
   na.rm = TRUE
 )
 #remove smallest 10% parcels
-parcels_2020_final <- parcels_2020_intersect[
+parcels_2020_observations <- parcels_2020_intersect[
   parcels_2020_intersect$parcel_area_m2 >= area_threshold_2020,
 ]
 
-parcels_2025_final <- parcels_2025_intersect[
+parcels_2025_observations <- parcels_2025_intersect[
   parcels_2025_intersect$parcel_area_m2 >= area_threshold_2025,
 ]
 
 #write outputs (parcels that had observation)
-st_write(parcels_2025_final,
-         "data/parcels_2025_final.gpkg",
+st_write(parcels_2025_observations,
+         "data/parcels_2025_observations.gpkg",
          delete_dsn = TRUE)
 
-st_write(parcels_2020_final,
-         "data/parcels_2020_final.gpkg",
+st_write(parcels_2020_observations,
+         "data/parcels_2020_observations.gpkg",
          delete_dsn = TRUE)
 
 
@@ -121,7 +117,7 @@ analyze_parcels <- function(parcels, year) {
 }
 
 # run analysis
-q10_2020 <- analyze_parcels(parcels_2020_final, 2020)
-q10_2025 <- analyze_parcels(parcels_2025_final, 2025)
+q10_2020 <- analyze_parcels(parcels_2020_observations, 2020)
+q10_2025 <- analyze_parcels(parcels_2025_observations, 2025)
 
 
