@@ -17,7 +17,7 @@ library(sf)
 library(dplyr)
 
 #user input
-year <- 2020
+year <- 2025
 
 # Setup
 out_dir <- "data"
@@ -49,6 +49,15 @@ run_pipeline <- function(year) {
   obs     <- st_read(paths$obs, quiet = TRUE)
   
   #task 1
+  
+  parcels <- st_read(paths$parcels, quiet = TRUE)
+  obs     <- st_read(paths$obs, quiet = TRUE)
+  
+  # fix CRS mismatch
+  if (st_crs(parcels) != st_crs(obs)) {
+    obs <- st_transform(obs, st_crs(parcels))
+  }
+  
   idx <- st_intersects(parcels, obs)
   
   parcels$glyphosate <- as.integer(lengths(idx) > 0)
