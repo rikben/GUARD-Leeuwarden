@@ -373,11 +373,10 @@ generate_image_metadata <- function(satellite_images_reg, vector_file,
 }
 
 # ═════════════════════════════════════════════
-# MAIN: Call all functions in order
+# MAIN: Call all functions in order for 2020
 # ═════════════════════════════════════════════
-setwd("C:\\remote_sensing_Advanced_EO\\GUARD-Leeuwarden\\downloading")
 input_vector_file <- "data/dummyData.gpkg" 
-base_img_dir      <- "images"
+base_img_dir      <- "images_2020"
 start_date        <- "2020-03-23"
 end_date          <- "2020-05-07"
 
@@ -400,7 +399,7 @@ extract_rgb_patches(satellite_images_reg, my_polygons_with_id, base_img_dir)
 # 5. Generate parcel metadata CSV
 parcel_metadata <- generate_parcel_metadata(
   input_vector_file,
-  "metadata/parcel_metadata.csv"
+  "metadata/parcel_metadata2020.csv"
 )
 
 # 6. Generate image metadata CSV
@@ -408,7 +407,51 @@ image_metadata <- generate_image_metadata(
   satellite_images_reg,
   input_vector_file,
   polygon_summary_stats,
-  "metadata/image_metadata.csv"
+  "metadata/image_metadata2020.csv"
 )
 
-cat("\nAll operations complete!\n")
+cat("\nAll 2020 operations complete!\n")
+
+
+
+
+# ═════════════════════════════════════════════
+# MAIN: Call all functions in order for 2025
+# ═════════════════════════════════════════════
+
+input_vector_file <- "data/dummyData.gpkg" 
+base_img_dir      <- "images_2025"
+start_date        <- "2025-03-23"
+end_date          <- "2025-05-07"
+
+# 1. Download (includes CLOUD/SCL band)
+satellite_images <- download_images_and_prepare_data(
+  input_vector_file, start_date, end_date
+)
+
+# 2. Regularize
+satellite_images_reg <- regularize_cube(satellite_images)
+
+# 3. Read polygons and compute band statistics
+my_polygons          <- st_read(input_vector_file)
+polygon_summary_stats <- compute_polygon_stats(satellite_images_reg, my_polygons)
+
+# 4. Extract RGB image patches
+my_polygons_with_id <- st_read(input_vector_file) %>% mutate(polygon_id = row_number())
+extract_rgb_patches(satellite_images_reg, my_polygons_with_id, base_img_dir)
+
+# 5. Generate parcel metadata CSV
+parcel_metadata <- generate_parcel_metadata(
+  input_vector_file,
+  "metadata/parcel_metadata2025.csv"
+)
+
+# 6. Generate image metadata CSV
+image_metadata <- generate_image_metadata(
+  satellite_images_reg,
+  input_vector_file,
+  polygon_summary_stats,
+  "metadata/image_metadata2025.csv"
+)
+
+cat("\nAll 2025 operations complete!\n")
