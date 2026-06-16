@@ -1,7 +1,6 @@
 ### Script that will link to Waarnemingen.nl observations using an API and
 # it will retrieve all observations from defined time period (spring of 2020, 2025).
-# It will then extract geo information from them to make true points, and
-# those will later be linked to specific parcels in pairing_parcels script.
+# Extracts geo information to create sf point objects.
 
 # PACKAGES #
 #install.packages("httr2")
@@ -10,14 +9,23 @@ library(sf)
 library(httr2)
 library(jsonlite)
 
+# SETUP #
+out_dir <- "data"
+year <- c("2020", "2025")
+
+if (!dir.exists(out_dir)) {
+  dir.create(out_dir, recursive = TRUE)
+}
+
 
 # Call the Waarnemningen API to fetch all observations from 2020
+# Dates were reduced from 10.3. - 15.6. to 23.3. - 7.5
 url_2020 <- paste0(
   "https://waarneming.nl/api/v1/observations/",
   "?species_group=30",
   "&search=glyphosate+sprayed",
-  "&date_after=2020-03-10",
-  "&date_before=2020-06-15",
+  "&date_after=2020-03-23",
+  "&date_before=2020-05-07",
   "&limit=50000"
 )
 # and for the 2025 observations as well...
@@ -25,8 +33,8 @@ url_2025 <- paste0(
   "https://waarneming.nl/api/v1/observations/",
   "?species_group=30",
   "&search=glyphosate+sprayed",
-  "&date_after=2025-03-10",
-  "&date_before=2025-06-15",
+  "&date_after=2025-03-23",
+  "&date_before=2025-05-07",
   "&limit=50000"
 )
 
@@ -110,14 +118,6 @@ obs_2025_sf <- st_as_sf(
 obs_2020_sf <- st_transform(obs_2020_sf, 28992)
 obs_2025_sf <-  st_transform(obs_2025_sf, 28992)
 
-# create dir
-out_dir <- "data"
-year <- c("2020", "2025")
-
-# ---- Create output folder if needed ----
-if (!dir.exists(out_dir)) {
-  dir.create(out_dir, recursive = TRUE)
-}
 
 #optionally, export the final shapefiles (they will have id, accuracy, and geometry)
 write_to_gpkg <- function(shapefile, year, out_dir) {
@@ -135,8 +135,3 @@ write_to_gpkg(obs_2025_sf, year[2], out_dir)
 # make the logic of this script better through a function which does all of this 
 # based on a year you give it meaning you want RD_new sf object with observations 
 # for 2020? just give the function that year and it should do the rest:)
-
-
-### CLEANUP ### potentially
-# run function that does something like:
-#rm(obs_2020_raw, obs_2025_raw, obs_df_2020, obs_df_2025)
