@@ -109,8 +109,6 @@ obs_2025_sf <- st_as_sf(
 ## reproject both to RD new for later AND plot them to check if success
 obs_2020_sf <- st_transform(obs_2020_sf, 28992)
 obs_2025_sf <-  st_transform(obs_2025_sf, 28992)
-plot(st_geometry(obs_2020_sf))
-plot(st_geometry(obs_2025_sf))
 
 # create dir
 out_dir <- "data"
