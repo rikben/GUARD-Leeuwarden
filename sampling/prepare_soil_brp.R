@@ -21,7 +21,7 @@ selected_grid_file <- NA
 
 # Parallel settings
 use_parallel <- TRUE
-max_workers_manual <- NA  # e.g. set to 6 if you want to force 6 workers
+max_workers_manual <- 6  # e.g. set to 6 if you want to force 6 workers
 gb_ram_per_worker <- 15    # conservative memory estimate
 
 # ---- Create output folder ----
