@@ -84,6 +84,38 @@ download_images_and_prepare_data <- function(vector_file, start_date, end_date) 
 }
 
 # ─────────────────────────────────────────────
+# FUNCTION 1b: Check for existing raw data and reload as a sits cube
+# ─────────────────────────────────────────────
+
+check_existing_raw_data <- function(raw_data_dir, year) {
+  if (!dir.exists(raw_data_dir)) return(NULL)
+  
+  all_tifs  <- list.files(raw_data_dir, pattern = "\\.tif$", full.names = TRUE)
+  year_tifs <- all_tifs[grepl(as.character(year), basename(all_tifs))]
+  
+  if (length(year_tifs) == 0) return(NULL)
+  
+  cat("Found", length(year_tifs), "existing .tif files for year", year, "- reloading from disk\n")
+  
+  # Reload the cached raw files as a proper sits cube object
+  # (not just a file_info table) so sits_regularize() can still process it
+  cube <- sits::sits_cube(
+    source     = "AWS",
+    collection = "SENTINEL-2-L2A",
+    data_dir   = raw_data_dir,
+    parse_info = c("satellite", "sensor", "tile", "band", "date")
+  )
+  
+  # Keep only the rows relevant to this year, since data_dir may contain
+  # files from multiple years mixed together
+  cube$file_info <- lapply(cube$file_info, function(fi) {
+    fi[grepl(as.character(year), basename(fi$path)), ]
+  })
+  
+  return(cube)
+}
+
+# ─────────────────────────────────────────────
 # FUNCTION 2: Regularize the satellite data cube
 # ─────────────────────────────────────────────
 
@@ -390,26 +422,32 @@ years    <- c(2020, 2025)
 data_dir <- "../sampling/samples"
 
 parcel_files <- file.path(data_dir, paste0("sampled_parcels_", years, ".gpkg"))
-
-start_dates <- paste0(years, "-03-23")
-end_dates   <- paste0(years, "-05-07")
+start_dates  <- paste0(years, "-03-23")
+end_dates    <- paste0(years, "-05-07")
 
 for (idx in seq_along(years)) {
   yr <- years[idx]
   
   input_vector_file <- parcel_files[idx]
-  base_img_dir      <- paste0("images_", yr)
-  start_date        <- start_dates[idx]
-  end_date          <- end_dates[idx]
+  base_img_dir       <- paste0("images_", yr)
+  start_date         <- start_dates[idx]
+  end_date           <- end_dates[idx]
+  raw_data_dir       <- "data/raw-data"
   
   cat("\n===== Starting pipeline for year", yr, "=====\n")
   
-  # 1. Download (includes CLOUD/SCL band)
-  satellite_images <- download_images_and_prepare_data(
-    input_vector_file, start_date, end_date
-  )
+  # 1. Check for existing raw data first; reload it if found, otherwise download
+  existing_cube <- check_existing_raw_data(raw_data_dir, yr)
   
-  # 2. Regularize
+  if (!is.null(existing_cube)) {
+    satellite_images <- existing_cube
+  } else {
+    satellite_images <- download_images_and_prepare_data(
+      input_vector_file, start_date, end_date
+    )
+  }
+  
+  # 2. Regularize (always runs, regardless of source)
   satellite_images_reg <- regularize_cube(satellite_images)
   
   # 3. Read polygons and compute band statistics
