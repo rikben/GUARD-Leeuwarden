@@ -61,8 +61,9 @@ run_pipeline <- function(year) {
   parcels_g <- parcels[parcels$glyphosate == 1, ]
   parcels_n <- parcels[parcels$glyphosate == 0, ]
   
-  thr_g <- quantile(parcels_g$parcel_area_m2, 0.10, na.rm = TRUE)
-  thr_n <- quantile(parcels_n$parcel_area_m2, 0.10, na.rm = TRUE)
+  # Adjusted to 5% to salvage enough treated parcels before stratifying
+  thr_g <- quantile(parcels_g$parcel_area_m2, 0.05, na.rm = TRUE)
+  thr_n <- quantile(parcels_n$parcel_area_m2, 0.05, na.rm = TRUE)
   
   parcels_g_f <- parcels_g[parcels_g$parcel_area_m2 >= thr_g, ]
   parcels_n_f <- parcels_n[parcels_n$parcel_area_m2 >= thr_n, ]
