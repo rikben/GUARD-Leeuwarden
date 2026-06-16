@@ -66,7 +66,7 @@ download_images_and_prepare_data <- function(vector_file, start_date, end_date) 
     source     = "AWS",
     collection = "SENTINEL-2-L2A",
     roi        = roi_bbox,
-    bands      = c("B02", "B03", "B04", "B05", "B08", "CLOUD"),  # CLOUD = SCL mask
+    bands      = c("B02", "B03", "B04", "B05", "B08", "B8A", "B11", "CLOUD"),  # CLOUD = SCL mask
     start_date = start_date,
     end_date   = end_date
   )
@@ -141,7 +141,7 @@ compute_polygon_stats <- function(satellite_images_reg, my_polygons,
                                   scl_clear_values = c(4, 5, 6, 7)) {
   cube_files   <- dplyr::bind_rows(satellite_images_reg$file_info)
   unique_dates <- as.character(unique(cube_files$date))
-  bands_of_interest <- c("B02", "B03", "B04", "B05", "B08")
+  bands_of_interest <- c("B02", "B03", "B04", "B05", "B08", "B8A", "B11")
   
   cat("Bands available in cube_files:", paste(unique(cube_files$band), collapse = ", "), "\n")
   
@@ -335,16 +335,45 @@ generate_image_metadata <- function(satellite_images_reg, vector_file,
   image_id_counter <- 1
   
   for (dt in unique_dates) {
-    paths_NIR <- cube_files %>% filter(as.character(date) == dt, band == "B08") %>% pull(path)
-    paths_RED <- cube_files %>% filter(as.character(date) == dt, band == "B04") %>% pull(path)
+    paths_NIR  <- cube_files %>% filter(as.character(date) == dt, band == "B08") %>% pull(path)
+    paths_RED  <- cube_files %>% filter(as.character(date) == dt, band == "B04") %>% pull(path)
+    paths_GREEN<- cube_files %>% filter(as.character(date) == dt, band == "B03") %>% pull(path)
+    paths_RE   <- cube_files %>% filter(as.character(date) == dt, band == "B05") %>% pull(path)
+    paths_NIR8A<- cube_files %>% filter(as.character(date) == dt, band == "B8A") %>% pull(path)
+    paths_SWIR <- cube_files %>% filter(as.character(date) == dt, band == "B11") %>% pull(path)
     
     if (length(paths_NIR) == 0 || length(paths_RED) == 0) {
-      cat("Skipping NDVI for date", dt, "- missing B08 or B04\n")
+      cat("Skipping indices for date", dt, "- missing B08 or B04\n")
       next
     }
     
-    ndvi_scene <- (build_band(paths_NIR) - build_band(paths_RED)) /
-      (build_band(paths_NIR) + build_band(paths_RED))
+    band_NIR   <- build_band(paths_NIR)
+    band_RED   <- build_band(paths_RED)
+    band_GREEN <- if (length(paths_GREEN)  > 0) build_band(paths_GREEN)  else NULL
+    band_RE    <- if (length(paths_RE)     > 0) build_band(paths_RE)     else NULL
+    band_NIR8A <- if (length(paths_NIR8A)  > 0) build_band(paths_NIR8A)  else NULL
+    band_SWIR  <- if (length(paths_SWIR)   > 0) build_band(paths_SWIR)   else NULL
+    
+    # NDVI = (B8 - B4) / (B8 + B4)
+    ndvi_scene <- (band_NIR - band_RED) / (band_NIR + band_RED)
+    
+    # NDRE = (B8 - B5) / (B8 + B5)
+    ndre_scene <- if (!is.null(band_RE)) {
+      (band_NIR - band_RE) / (band_NIR + band_RE)
+    } else NULL
+    
+    # GNDVI = (B8 - B3) / (B8 + B3)
+    gndvi_scene <- if (!is.null(band_GREEN)) {
+      (band_NIR - band_GREEN) / (band_NIR + band_GREEN)
+    } else NULL
+    
+    # NIRv = B8 * (B8 - B4) / (B8 + B4)  ==  B8 * NDVI
+    nirv_scene <- band_NIR * ndvi_scene
+    
+    # NDWI = (B8A - B11) / (B8A + B11)
+    ndwi_scene <- if (!is.null(band_NIR8A) && !is.null(band_SWIR)) {
+      (band_NIR8A - band_SWIR) / (band_NIR8A + band_SWIR)
+    } else NULL
     
     # Cloud mask for this date
     cloud_paths  <- cube_files %>% filter(as.character(date) == dt, band == "CLOUD") %>% pull(path)
@@ -356,28 +385,36 @@ generate_image_metadata <- function(satellite_images_reg, vector_file,
       poly_single <- poly_proj[i, ]
       pid         <- poly_single$parcel_id
       
-      result <- tryCatch({
-        cropped       <- terra::crop(ndvi_scene, poly_single)
-        combined_mask <- get_combined_mask(cropped, poly_single, cloud_raster, scl_clear_values)
-        masked        <- terra::mask(cropped, combined_mask)
-        vals          <- terra::values(masked, na.rm = TRUE)
-        
-        c(safe_mean_sd(vals), list(n_valid = length(vals)))
-      }, error = function(e) list(mean = NA_real_, sd = NA_real_, n_valid = 0))
+      # Helper to crop/mask/summarize one index scene for this polygon
+      summarize_index <- function(index_scene) {
+        if (is.null(index_scene)) return(list(mean = NA_real_, sd = NA_real_, n_valid = 0))
+        tryCatch({
+          cropped       <- terra::crop(index_scene, poly_single)
+          combined_mask <- get_combined_mask(cropped, poly_single, cloud_raster, scl_clear_values)
+          masked        <- terra::mask(cropped, combined_mask)
+          vals          <- terra::values(masked, na.rm = TRUE)
+          c(safe_mean_sd(vals), list(n_valid = length(vals)))
+        }, error = function(e) list(mean = NA_real_, sd = NA_real_, n_valid = 0))
+      }
       
-      ndvi_vals <- list(mean = result$mean, sd = result$sd)
+      ndvi_res  <- summarize_index(ndvi_scene)
+      ndre_res  <- summarize_index(ndre_scene)
+      gndvi_res <- summarize_index(gndvi_scene)
+      nirv_res  <- summarize_index(nirv_scene)
+      ndwi_res  <- summarize_index(ndwi_scene)
       
       # Suggested class label based on NDVI thresholds
       suggested_label <- dplyr::case_when(
-        is.na(ndvi_vals$mean) ~ "no_data",
-        ndvi_vals$mean > 0.7  ~ "green",
-        ndvi_vals$mean > 0.6  ~ "slightly_yellow",
-        ndvi_vals$mean > 0.3  ~ "yellow",
+        is.na(ndvi_res$mean) ~ "no_data",
+        ndvi_res$mean > 0.6   ~ "green",
+        ndvi_res$mean > 0.45  ~ "slightly_yellow",
+        ndvi_res$mean > 0.3   ~ "yellow",
         TRUE                  ~ "ploughed"
       )
+    
       
-      # Mark as discarded if no valid (fully-covered, cloud-free) pixels exist
-      discarded_flag <- if (result$n_valid == 0) "yes" else NA_character_
+      # Mark as discarded if no valid (fully-covered, cloud-free) pixels exist for NDVI
+      discarded_flag <- if (ndvi_res$n_valid == 0) "yes" else NA_character_
       
       image_records[[image_id_counter]] <- data.frame(
         image_id              = paste0("IMG_", sprintf("%05d", image_id_counter)),
@@ -385,16 +422,24 @@ generate_image_metadata <- function(satellite_images_reg, vector_file,
         image_date            = dt,
         file_path             = file.path("data", paste0("plot_", pid),
                                           paste0("RGB_", dt, ".tif")),
-        ndvi_mean             = round(ndvi_vals$mean, 4),
-        ndvi_sd               = round(ndvi_vals$sd,   4),
-        suggested_class_label = suggested_label,
-        class_label           = NA_character_,
-        discarded             = discarded_flag,
-        stringsAsFactors      = FALSE
+        ndvi_mean              = round(ndvi_res$mean, 4),
+        ndvi_sd                = round(ndvi_res$sd,   4),
+        ndre_mean              = round(ndre_res$mean, 4),
+        ndre_sd                = round(ndre_res$sd,   4),
+        gndvi_mean             = round(gndvi_res$mean, 4),
+        gndvi_sd               = round(gndvi_res$sd,   4),
+        nirv_mean              = round(nirv_res$mean, 4),
+        nirv_sd                = round(nirv_res$sd,   4),
+        ndwi_mean              = round(ndwi_res$mean, 4),
+        ndwi_sd                = round(ndwi_res$sd,   4),
+        suggested_class_label  = suggested_label,
+        class_label            = NA_character_,
+        discarded              = discarded_flag,
+        stringsAsFactors       = FALSE
       )
       image_id_counter <- image_id_counter + 1
     }
-    cat("NDVI computed for date:", dt, "\n")
+    cat("Indices computed for date:", dt, "\n")
   }
   
   image_metadata <- dplyr::bind_rows(image_records)
