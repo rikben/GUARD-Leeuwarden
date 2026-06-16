@@ -48,10 +48,6 @@ run_pipeline <- function(year) {
   parcels <- st_read(paths$parcels, quiet = TRUE)
   obs     <- st_read(paths$obs, quiet = TRUE)
   
-  #task 1
-  
-  parcels <- st_read(paths$parcels, quiet = TRUE)
-  obs     <- st_read(paths$obs, quiet = TRUE)
   
   # fix CRS mismatch
   if (st_crs(parcels) != st_crs(obs)) {
