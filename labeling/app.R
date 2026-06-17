@@ -14,6 +14,7 @@ label_choices <- c(
   "2 - slightly yellow" = "slightly_yellow",
   "3 - yellow" = "yellow",
   "4 - ploughed" = "ploughed",
+  "5 - sparse vegetation (no glyphosate)" = "sparse_vegetation_no_glyphosate",
   "discard / no data" = "no_data"
 )
 
