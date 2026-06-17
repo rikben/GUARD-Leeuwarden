@@ -302,7 +302,11 @@ generate_parcel_metadata <- function(vector_file, output_path) {
   parcel_metadata <- my_polygons_meta %>%
     mutate(
       folder_name = paste0("plot_", feature_id),
-      glyphosate  = NA,
+      glyphosate  = dplyr::case_when(
+        glyphosate == 1 ~ "yes",
+        glyphosate == 0 ~ "no",
+        TRUE             ~ NA_character_
+      ),
       discarded   = NA
     ) %>%
     rename(brp_id = parcel_id) %>%
