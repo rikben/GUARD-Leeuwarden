@@ -3,9 +3,11 @@ library(dplyr)
 library(readr)
 library(DT)
 
-parcel_csv <- "../downloading/parcel_metadata.csv"
-image_csv  <- "../downloading/image_metadata.csv"
-image_root <- "../downloading/images"
+year <- "2020"
+
+parcel_csv <- paste0("../downloading/metadata/parcel_metadata",year,".csv")
+image_csv  <- paste0("../downloading/metadata/image_metadata",year,".csv")
+image_root <- paste0("../downloading/images_",year)
 
 addResourcePath("plot_images", normalizePath(image_root))
 
@@ -21,8 +23,23 @@ label_choices <- c(
 parcel_meta <- read_csv(parcel_csv, show_col_types = FALSE)
 image_meta  <- read_csv(image_csv, show_col_types = FALSE)
 
-parcel_meta$discarded <- ifelse(is.na(parcel_meta$discarded), FALSE, parcel_meta$discarded)
-image_meta$discarded  <- ifelse(is.na(image_meta$discarded), FALSE, image_meta$discarded)
+parcel_meta <- parcel_meta |>
+  mutate(
+    discarded = case_when(
+      is.na(discarded) ~ FALSE,
+      discarded %in% c(TRUE, "TRUE", "true", "yes", "Yes", "1") ~ TRUE,
+      TRUE ~ FALSE
+    )
+  )
+
+image_meta <- image_meta |>
+  mutate(
+    discarded = case_when(
+      is.na(discarded) ~ FALSE,
+      discarded %in% c(TRUE, "TRUE", "true", "yes", "Yes", "1") ~ TRUE,
+      TRUE ~ FALSE
+    )
+  )
 
 ui <- fluidPage(
   tags$head(
