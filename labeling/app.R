@@ -25,13 +25,21 @@ parcel_meta$discarded <- ifelse(is.na(parcel_meta$discarded), FALSE, parcel_meta
 image_meta$discarded  <- ifelse(is.na(image_meta$discarded), FALSE, image_meta$discarded)
 
 ui <- fluidPage(
+  tags$head(
+    tags$script(HTML("
+      Shiny.addCustomMessageHandler('scroll_top', function(message) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    "))
+  ),
+  
   titlePanel("Image labelling tool"),
   
   sidebarLayout(
     sidebarPanel(
       selectInput("parcel_id", "Select plot", choices = parcel_meta$parcel_id),
       hr(),
-      verbatimTextOutput("plot_info"),
+      uiOutput("plot_info"),
       actionButton("discard_plot", "Discard plot"),
       actionButton("save", "Save progress"),
       hr(),
@@ -40,7 +48,9 @@ ui <- fluidPage(
     ),
     
     mainPanel(
-      uiOutput("image_cards")
+      uiOutput("image_cards"),
+      hr(),
+      actionButton("next_plot_bottom", "Save and next plot")
     )
   )
 )
@@ -61,9 +71,30 @@ server <- function(input, output, session) {
       filter(parcel_id == as.numeric(input$parcel_id))
   })
   
-  output$plot_info <- renderPrint({
-    selected_parcel() |>
-      select(parcel_id, brp_id, folder_name, glyphosate, discarded)
+  output$plot_info <- renderUI({
+    parcel <- selected_parcel()
+    imgs <- selected_images()
+    
+    n_images <- nrow(imgs)
+    n_labelled <- sum(!is.na(imgs$class_label) & imgs$class_label != "")
+    n_discarded <- sum(imgs$discarded, na.rm = TRUE)
+    
+    labelled_status <- ifelse(
+      n_labelled == n_images,
+      "COMPLETE",
+      paste0("INCOMPLETE: ", n_labelled, " / ", n_images, " images labelled")
+    )
+    
+    tagList(
+      tags$h4("Plot information"),
+      tags$p(strong("Parcel ID: "), parcel$parcel_id),
+      tags$p(strong("BRP ID: "), parcel$brp_id),
+      tags$p(strong("Folder: "), parcel$folder_name),
+      tags$p(strong("Glyphosate: "), parcel$glyphosate),
+      tags$p(strong("Plot discarded: "), parcel$discarded),
+      tags$p(strong("Labelling status: "), labelled_status),
+      tags$p(strong("Discarded images: "), paste0(n_discarded, " / ", n_images))
+    )
   })
   
   output$image_cards <- renderUI({
@@ -124,15 +155,6 @@ server <- function(input, output, session) {
       local({
         image_id <- id
         
-        observeEvent(input[[paste0("label_", image_id)]], {
-          value <- input[[paste0("label_", image_id)]]
-          if (!is.null(value) && value != "") {
-            x <- images()
-            x$class_label[x$image_id == image_id] <- value
-            images(x)
-          }
-        }, ignoreInit = TRUE)
-        
         observeEvent(input[[paste0("discard_", image_id)]], {
           x <- images()
           x$discarded[x$image_id == image_id] <- TRUE
@@ -157,6 +179,25 @@ server <- function(input, output, session) {
     }
     
     showNotification("Saved. Moved to next plot.", type = "message")
+  })
+  
+  observeEvent(input$next_plot_bottom, {
+    save_current_plot()
+    
+    parcel_ids <- parcels()$parcel_id
+    current_index <- which(parcel_ids == as.numeric(input$parcel_id))
+    
+    if (current_index < length(parcel_ids)) {
+      updateSelectInput(
+        session,
+        "parcel_id",
+        selected = parcel_ids[current_index + 1]
+      )
+    }
+    
+    showNotification("Saved. Moved to next plot.", type = "message")
+    
+    session$sendCustomMessage("scroll_top", list())
   })
   
   observeEvent(input$previous_plot, {
