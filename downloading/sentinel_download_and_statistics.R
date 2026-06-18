@@ -29,7 +29,7 @@ get_full_pixel_mask <- function(raster_template, poly_single, threshold = 0.999)
 # raster_template: an already-cropped raster defining the target grid/extent.
 # cloud_raster: the full-scene SCL raster (NOT yet cropped), or NULL if unavailable.
 get_combined_mask <- function(raster_template, poly_single, cloud_raster = NULL,
-                              scl_clear_values = c(4, 5, 6, 7)) {
+                              scl_clear_values = c(4, 5, 6)) {
   full_mask <- get_full_pixel_mask(raster_template, poly_single)
   
   if (!is.null(cloud_raster)) {
@@ -138,7 +138,7 @@ regularize_cube <- function(satellite_images) {
 # ─────────────────────────────────────────────
 
 compute_polygon_stats <- function(satellite_images_reg, my_polygons,
-                                  scl_clear_values = c(4, 5, 6, 7)) {
+                                  scl_clear_values = c(4, 5, 6)) {
   cube_files   <- dplyr::bind_rows(satellite_images_reg$file_info)
   unique_dates <- as.character(unique(cube_files$date))
   bands_of_interest <- c("B02", "B03", "B04", "B05", "B08", "B8A", "B11")
@@ -217,7 +217,7 @@ compute_polygon_stats <- function(satellite_images_reg, my_polygons,
 # ─────────────────────────────────────────────
 
 extract_rgb_patches <- function(satellite_images_reg, my_polygons, base_img_dir,
-                                scl_clear_values = c(4, 5, 6, 7)) {
+                                scl_clear_values = c(4, 5, 6)) {
   if (!dir.exists(base_img_dir)) dir.create(base_img_dir, recursive = TRUE)
   
   cube_files       <- dplyr::bind_rows(satellite_images_reg$file_info)
@@ -320,7 +320,7 @@ generate_parcel_metadata <- function(vector_file, output_path) {
 
 generate_image_metadata <- function(satellite_images_reg, vector_file,
                                     polygon_summary_stats, output_path,
-                                    scl_clear_values = c(4, 5, 6, 7)) {
+                                    scl_clear_values = c(4, 5, 6)) {
   output_dir <- dirname(output_path)
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
   
