@@ -3,7 +3,7 @@ library(dplyr)
 library(readr)
 library(DT)
 
-year <- "2020"
+year <- "2025"
 
 parcel_csv <- paste0("../downloading/metadata/parcel_metadata",year,".csv")
 image_csv  <- paste0("../downloading/metadata/image_metadata",year,".csv")
@@ -16,7 +16,6 @@ label_choices <- c(
   "2 - slightly yellow" = "slightly_yellow",
   "3 - yellow" = "yellow",
   "4 - ploughed" = "ploughed",
-  "5 - sparse vegetation (no glyphosate)" = "sparse_vegetation_no_glyphosate",
   "discard / no data" = "no_data"
 )
 
@@ -57,8 +56,8 @@ ui <- fluidPage(
       selectInput("parcel_id", "Select plot", choices = parcel_meta$parcel_id),
       hr(),
       uiOutput("plot_info"),
-      actionButton("discard_plot", "Discard plot"),
-      actionButton("save", "Save progress"),
+      uiOutput("discard_button"),
+      actionButton("save", "Save plot"),
       hr(),
       actionButton("previous_plot", "Previous plot"),
       actionButton("next_plot", "Save and next plot")
@@ -67,7 +66,10 @@ ui <- fluidPage(
     mainPanel(
       uiOutput("image_cards"),
       hr(),
-      actionButton("next_plot_bottom", "Save and next plot")
+      actionButton("next_plot_bottom", "Save and next plot"),
+      actionButton("discard_next_plot_bottom", "Discard and next plot"),
+      br(),
+      br()
     )
   )
 )
@@ -108,9 +110,23 @@ server <- function(input, output, session) {
       tags$p(strong("BRP ID: "), parcel$brp_id),
       tags$p(strong("Folder: "), parcel$folder_name),
       tags$p(strong("Glyphosate: "), parcel$glyphosate),
-      tags$p(strong("Plot discarded: "), parcel$discarded),
+      tags$p(
+        strong("Plot discarded: "),
+        if (isTRUE(parcel$discarded)) {
+          tags$span("TRUE", style = "color:red; font-weight:bold;")
+        } else {
+          "FALSE"
+        }
+      ),
       tags$p(strong("Labelling status: "), labelled_status),
-      tags$p(strong("Discarded images: "), paste0(n_discarded, " / ", n_images))
+      tags$p(
+        strong("Discarded images: "),
+        if (n_discarded > 0) {
+          tags$span(paste0(n_discarded, " / ", n_images), style = "color:red; font-weight:bold;")
+        } else {
+          paste0(n_discarded, " / ", n_images)
+        }
+      )
     )
   })
   
@@ -146,7 +162,14 @@ server <- function(input, output, session) {
             p(paste("NDVI mean:", round(row$ndvi_mean, 3))),
             p(paste("NDVI SD:", round(row$ndvi_sd, 3))),
             p(paste("Suggested:", row$suggested_class_label)),
-            p(paste("Discarded:", row$discarded)),
+            p(
+              strong("Discarded: "),
+              if (isTRUE(row$discarded)) {
+                tags$span("TRUE", style = "color:red; font-weight:bold;")
+              } else {
+                "FALSE"
+              }
+            ),
             
             selectInput(
               paste0("label_", row$image_id),
@@ -154,30 +177,25 @@ server <- function(input, output, session) {
               choices = label_choices,
               selected = default_label
             ),
-            
-            actionButton(
-              paste0("discard_", row$image_id),
-              "Discard image"
-            )
           )
         )
       )
     }))
   })
   
-  observe({
-    imgs <- images()
+  output$discard_button <- renderUI({
+    parcel <- selected_parcel()
     
-    for (id in imgs$image_id) {
-      local({
-        image_id <- id
-        
-        observeEvent(input[[paste0("discard_", image_id)]], {
-          x <- images()
-          x$discarded[x$image_id == image_id] <- TRUE
-          images(x)
-        }, ignoreInit = TRUE)
-      })
+    if (isTRUE(parcel$discarded[1])) {
+      actionButton(
+        "toggle_discard_plot",
+        "Restore plot"
+      )
+    } else {
+      actionButton(
+        "toggle_discard_plot",
+        "Discard plot"
+      )
     }
   })
   
@@ -196,6 +214,30 @@ server <- function(input, output, session) {
     }
     
     showNotification("Saved. Moved to next plot.", type = "message")
+  })
+  
+  observeEvent(input$discard_next_plot_bottom, {
+    save_current_plot()
+    
+    x <- parcels()
+    x$discarded[x$parcel_id == as.numeric(input$parcel_id)] <- TRUE
+    parcels(x)
+    write_csv(parcels(), parcel_csv)
+    
+    parcel_ids <- parcels()$parcel_id
+    current_index <- which(parcel_ids == as.numeric(input$parcel_id))
+    
+    if (current_index < length(parcel_ids)) {
+      updateSelectInput(
+        session,
+        "parcel_id",
+        selected = parcel_ids[current_index + 1]
+      )
+    }
+    
+    showNotification("Plot discarded. Moved to next plot.", type = "warning")
+    
+    session$sendCustomMessage("scroll_top", list())
   })
   
   observeEvent(input$next_plot_bottom, {
@@ -234,10 +276,35 @@ server <- function(input, output, session) {
     showNotification("Saved. Moved to previous plot.", type = "message")
   })
   
-  observeEvent(input$discard_plot, {
+  observeEvent(input$toggle_discard_plot, {
+    save_current_plot()
+    
     x <- parcels()
-    x$discarded[x$parcel_id == as.numeric(input$parcel_id)] <- TRUE
+    
+    current_status <- x$discarded[
+      x$parcel_id == as.numeric(input$parcel_id)
+    ]
+    
+    new_status <- !current_status
+    
+    x$discarded[
+      x$parcel_id == as.numeric(input$parcel_id)
+    ] <- new_status
+    
     parcels(x)
+    write_csv(parcels(), parcel_csv)
+    
+    if (new_status) {
+      showNotification(
+        "Plot discarded. Labels were preserved.",
+        type = "warning"
+      )
+    } else {
+      showNotification(
+        "Plot restored.",
+        type = "message"
+      )
+    }
   })
   
   observeEvent(input$save, {
@@ -247,16 +314,33 @@ server <- function(input, output, session) {
   
   save_current_plot <- function() {
     x <- images()
+    current_ids <- selected_images()$image_id
     
-    for (id in selected_images()$image_id) {
+    for (id in current_ids) {
       input_id <- paste0("label_", id)
       
       if (!is.null(input[[input_id]])) {
-        x$class_label[x$image_id == id] <- input[[input_id]]
+        current_label <- input[[input_id]]
+        
+        x$class_label[x$image_id == id] <- current_label
+        x$discarded[x$image_id == id] <- current_label == "no_data"
       }
     }
     
     images(x)
+    
+    # If all images in the current plot are no_data, discard the plot as well
+    current_plot_images <- x |> 
+      filter(parcel_id == as.numeric(input$parcel_id))
+    
+    all_no_data <- nrow(current_plot_images) > 0 &&
+      all(current_plot_images$class_label == "no_data", na.rm = FALSE)
+    
+    p <- parcels()
+    if (all_no_data) {
+      p$discarded[p$parcel_id == as.numeric(input$parcel_id)] <- TRUE
+    }
+    parcels(p)
     
     write_csv(parcels(), parcel_csv)
     write_csv(images(), image_csv)
