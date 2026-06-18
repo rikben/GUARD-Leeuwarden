@@ -467,8 +467,8 @@ years    <- c(2020, 2025)
 data_dir <- "../sampling/samples"
 
 parcel_files <- file.path(data_dir, paste0("sampled_parcels_", years, ".gpkg"))
-start_dates  <- paste0(years, "-03-23")
-end_dates    <- paste0(years, "-05-07")
+start_dates  <- paste0(years, "-03-01")
+end_dates    <- paste0(years, "-05-15")
 
 for (idx in seq_along(years)) {
   yr <- years[idx]
