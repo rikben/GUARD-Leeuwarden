@@ -19,8 +19,8 @@ if (!dir.exists(out_dir)) {
 
 ## Core function that will fetch per variable from Waarnemingen API ##
 fetch_observations <- function(year,
-                               date_start = "01-03",
-                               date_end   = "15-05",
+                               date_start = "03-01",
+                               date_end   = "05-15",
                                limit      = 50000,
                                out_dir    = NULL) {
   year <- as.character(year)
