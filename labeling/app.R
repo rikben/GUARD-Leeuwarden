@@ -162,21 +162,14 @@ server <- function(input, output, session) {
             p(paste("NDVI mean:", round(row$ndvi_mean, 3))),
             p(paste("NDVI SD:", round(row$ndvi_sd, 3))),
             p(paste("Suggested:", row$suggested_class_label)),
-            p(
-              strong("Discarded: "),
-              if (isTRUE(row$discarded)) {
-                tags$span("TRUE", style = "color:red; font-weight:bold;")
-              } else {
-                "FALSE"
-              }
-            ),
+            uiOutput(paste0("discard_status_", row$image_id)),
             
             selectInput(
               paste0("label_", row$image_id),
               "Label",
               choices = label_choices,
               selected = default_label
-            ),
+            )
           )
         )
       )
@@ -221,7 +214,10 @@ server <- function(input, output, session) {
                 later_input_id <- paste0("label_", later_id)
                 later_label <- input[[later_input_id]]
                 
-                if (!is.null(later_label) && later_label != "no_data") {
+                if (!is.null(later_label) &&
+                    later_label != "no_data" &&
+                    later_label != "green") {
+                  
                   updateSelectInput(
                     session,
                     later_input_id,
@@ -232,6 +228,39 @@ server <- function(input, output, session) {
             }
           }
         }, ignoreInit = TRUE)
+      })
+    }
+  })
+  
+  observe({
+    imgs <- selected_images()
+    
+    for (id in imgs$image_id) {
+      local({
+        image_id <- id
+        
+        output[[paste0("discard_status_", image_id)]] <- renderUI({
+          
+          current_label <- input[[paste0("label_", image_id)]]
+          
+          discarded_now <- if (is.null(current_label)) {
+            isTRUE(images()$discarded[images()$image_id == image_id][1])
+          } else {
+            identical(current_label, "no_data")
+          }
+          
+          tags$p(
+            strong("Discarded: "),
+            if (discarded_now) {
+              tags$span(
+                "TRUE",
+                style = "color:red; font-weight:bold;"
+              )
+            } else {
+              "FALSE"
+            }
+          )
+        })
       })
     }
   })
