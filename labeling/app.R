@@ -3,7 +3,7 @@ library(dplyr)
 library(readr)
 library(DT)
 
-year <- "2025"
+year <- "2020"
 
 parcel_csv <- paste0("../downloading/metadata/parcel_metadata",year,".csv")
 image_csv  <- paste0("../downloading/metadata/image_metadata",year,".csv")
@@ -196,6 +196,43 @@ server <- function(input, output, session) {
         "toggle_discard_plot",
         "Discard plot"
       )
+    }
+  })
+  
+  observe({
+    imgs <- images()
+    
+    for (id in imgs$image_id) {
+      local({
+        image_id <- id
+        
+        observeEvent(input[[paste0("label_", image_id)]], {
+          selected_label <- input[[paste0("label_", image_id)]]
+          
+          if (!is.null(selected_label) && selected_label == "ploughed") {
+            current_imgs <- selected_images()
+            current_pos <- which(current_imgs$image_id == image_id)
+            
+            if (length(current_pos) == 1 && current_pos < nrow(current_imgs)) {
+              later_imgs <- current_imgs |>
+                slice((current_pos + 1):n())
+              
+              for (later_id in later_imgs$image_id) {
+                later_input_id <- paste0("label_", later_id)
+                later_label <- input[[later_input_id]]
+                
+                if (!is.null(later_label) && later_label != "no_data") {
+                  updateSelectInput(
+                    session,
+                    later_input_id,
+                    selected = "ploughed"
+                  )
+                }
+              }
+            }
+          }
+        }, ignoreInit = TRUE)
+      })
     }
   })
   
