@@ -463,12 +463,27 @@ generate_image_metadata <- function(satellite_images_reg, vector_file,
 # MAIN: Call all functions in order for each year
 # ═════════════════════════════════════════════
 
-years    <- c(2020, 2025)
+years    <- c(2025)
 data_dir <- "../sampling/samples"
 
 parcel_files <- file.path(data_dir, paste0("sampled_parcels_", years, ".gpkg"))
 start_dates  <- paste0(years, "-03-01")
 end_dates    <- paste0(years, "-05-15")
+
+dir.create(file.path(getwd(), "tmp"), showWarnings = FALSE, recursive = TRUE)
+
+Sys.setenv(
+  TMPDIR = file.path(getwd(), "tmp"),
+  TEMP   = file.path(getwd(), "tmp"),
+  TMP    = file.path(getwd(), "tmp")
+)
+
+terra::terraOptions(
+  tempdir = file.path(getwd(), "tmp"),
+  memfrac = 0.6,
+  todisk = TRUE,
+  progress = 1
+)
 
 for (idx in seq_along(years)) {
   yr <- years[idx]
