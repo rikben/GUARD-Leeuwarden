@@ -274,6 +274,7 @@ generate_image_metadata <- function(satellite_images_reg, vector_file,
     ndvi_scene  <- (band_NIR - band_RED) / (band_NIR + band_RED)
     ndre_scene  <- if (!is.null(band_RE)) { (band_NIR - band_RE) / (band_NIR + band_RE) } else NULL
     gndvi_scene <- if (!is.null(band_GREEN)) { (band_NIR - band_GREEN) / (band_NIR + band_GREEN) } else NULL
+    ndwi_scene <- if (!is.null(band_GREEN)) { (band_GREEN - band_NIR) / (band_GREEN + band_NIR) } else NULL
     nirv_scene  <- band_NIR * ndvi_scene
     
     cloud_paths  <- cube_files %>% filter(as.character(date) == dt, band == "CLOUD") %>% pull(path)
@@ -299,6 +300,7 @@ generate_image_metadata <- function(satellite_images_reg, vector_file,
       ndvi_res  <- summarize_index(ndvi_scene)
       ndre_res  <- summarize_index(ndre_scene)
       gndvi_res <- summarize_index(gndvi_scene)
+      ndwi_res  <- summarize_index(ndwi_scene)
       nirv_res  <- summarize_index(nirv_scene)
       
       discarded_flag <- if (ndvi_res[["n_valid"]] == 0) "yes" else NA_character_
@@ -310,6 +312,7 @@ generate_image_metadata <- function(satellite_images_reg, vector_file,
         ndvi_mean             = round(ndvi_res[["mean"]], 4),
         ndre_mean             = round(ndre_res[["mean"]], 4),
         gndvi_mean            = round(gndvi_res[["mean"]], 4),
+        ndwi_mean             = round(ndwi_res[["mean"]], 4),
         nirv_mean             = round(nirv_res[["mean"]], 4),
         discarded             = discarded_flag,
         stringsAsFactors      = FALSE
