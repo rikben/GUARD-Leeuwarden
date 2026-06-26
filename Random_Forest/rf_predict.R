@@ -1,6 +1,6 @@
-# Main function of this script
-# Read RF model -> take information from attributes date, class_label, uncertainty, group_id
-# -> create a moving window that iterates over time and keeps the accepted class_label patterns
+# Main function of this script # Read RF model -> 
+#take information from attributes date, class_label, uncertainty, group_id 
+# -> create a moving window that iterates over time and keeps the accepted class_label patterns 
 # -> removes duplicates (based on following rules: 'latest' 1 and 'earliest' 4, and the image of the classes 
 # between 1-4 which have the highest certainty are kept)
 
@@ -16,7 +16,7 @@ if (!dir.exists(out_dir)) {
 # ------------------------------------------------------------
 # LOAD
 # ------------------------------------------------------------
-file_path <- here("downloading/metadata", "image_metadata2020_final.csv")
+file_path <- here("downloading/results", "predictions_2026.csv")
 
 df <- read_csv(file_path, show_col_types = FALSE) %>%
   select(parcel_id, image_date, predicted_class, predicted_probability) %>%
@@ -47,28 +47,19 @@ remove_consecutive_duplicates <- function(df) {
     d <- parcels[[pid]]
     
     run_id <- cumsum(
-      c(TRUE, d$predicted_class[-1] != d$predicted_class[-nrow(d)])
+      c(TRUE,
+        d$predicted_class[-1] != d$predicted_class[-nrow(d)])
     )
     
     cleaned <- lapply(split(d, run_id), function(x) {
-      
-      cls <- x$predicted_class[1]
-      
-      if (cls == "green") {
-        x[nrow(x), ]                # latest green
-        
-      } else if (cls == "ploughed") {
-        x[1, ]                      # earliest ploughed
-        
-      } else {
-        x[which.max(x$predicted_probability), ]  # highest probability
-      }
+      x[which.max(x$predicted_probability), ]
     })
     
     out[[pid]] <- bind_rows(cleaned)
   }
   
-  bind_rows(out) %>% arrange(parcel_id, image_date)
+  bind_rows(out) %>%
+    arrange(parcel_id, image_date)
 }
 
 df_clean <- remove_consecutive_duplicates(df)
@@ -112,15 +103,19 @@ process_parcels <- function(df, window_days = 25) {
   
   for (pid in names(parcels)) {
     
-    d <- parcels[[pid]] %>% arrange(image_date)
-    dates <- unique(d$image_date)
+    d <- parcels[[pid]] %>%
+      arrange(image_date)
+    
+    d <- remove_consecutive_duplicates(d)
+    
+    n <- nrow(d)
     
     glyphosate <- FALSE
+    valid_window_probs <- NULL
     
-    # -----------------------------
-    # WINDOW SEARCH (classification only)
-    # -----------------------------
-    for (start_date in dates) {
+    for (i in seq_len(n)) {
+      
+      start_date <- d$image_date[i]
       
       window <- d %>%
         filter(image_date >= start_date &
@@ -133,19 +128,23 @@ process_parcels <- function(df, window_days = 25) {
       
       if (is_valid_window(seq, allowed_patterns)) {
         glyphosate <- TRUE
+        valid_window_probs <- window$predicted_probability
         break
       }
     }
     
-    # -----------------------------
-    # FINAL OUTPUT 
-    # -----------------------------
+    avg_probability <- if (!is.null(valid_window_probs)) {
+      mean(valid_window_probs, na.rm = TRUE)
+    } else {
+      mean(d$predicted_probability, na.rm = TRUE)
+    }
+    
+    avg_probability <- round(avg_probability, 3)
+    
     results[[pid]] <- data.frame(
       parcel_id = pid,
       glyphosate = ifelse(glyphosate, "yes", "no"),
-      
-      
-      avg_probability = mean(d$predicted_probability, na.rm = TRUE)
+      avg_probability = avg_probability
     )
   }
   
@@ -158,8 +157,3 @@ process_parcels <- function(df, window_days = 25) {
 final_results <- process_parcels(df_clean)
 
 write_csv(final_results, here("downloading/data", "parcel_predictions.csv"))
-
-
-# Later, create second prediction script which will test on new un-labelled data from Leeuwarden
-# Takes .gpkg with all Leeuwarden parcels
-# grabs new images, runs model, repeats pattern search (prediction)
