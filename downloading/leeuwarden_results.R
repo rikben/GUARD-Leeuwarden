@@ -1,11 +1,26 @@
-library(sits)
-library(sf)
-library(httr2)
-library(tidyverse)
-library(terra)
-library(dplyr)
-library(ranger)
-library(readr)
+required_packages <- c(
+  "sits",
+  "sf",
+  "httr2",
+  "tidyverse",
+  "terra",
+  "dplyr",
+  "ranger",
+  "readr"
+)
+
+install_if_missing <- function(pkg) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    message("Installing missing package: ", pkg)
+    install.packages(pkg, repos = "https://cloud.r-project.org")
+  }
+}
+
+invisible(lapply(required_packages, install_if_missing))
+invisible(lapply(required_packages, function(pkg) {
+  message("Loading package: ", pkg)
+  library(pkg, character.only = TRUE)
+}))
 
 dir.create(file.path(getwd(), "tmp"), showWarnings = FALSE, recursive = TRUE)
 dir.create(file.path(getwd(), "metadata"), showWarnings = FALSE, recursive = TRUE)
