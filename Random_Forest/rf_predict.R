@@ -16,7 +16,7 @@ if (!dir.exists(out_dir)) {
 # ------------------------------------------------------------
 # LOAD
 # ------------------------------------------------------------
-file_path <- here("downloading/results", "predictions_2026.csv")
+file_path <- here("downloading/metadata", "image_metadata2020_final.csv")
 
 df <- read_csv(file_path, show_col_types = FALSE) %>%
   select(parcel_id, image_date, predicted_class, predicted_probability) %>%
@@ -35,7 +35,7 @@ df <- df %>%
   arrange(parcel_id, image_date)
 
 # ------------------------------------------------------------
-# DUPLICATE REMOVAL (IMPORTANT: keep signal but compress noise)
+# DUPLICATE REMOVAL 
 # ------------------------------------------------------------
 remove_consecutive_duplicates <- function(df) {
   
@@ -61,7 +61,7 @@ remove_consecutive_duplicates <- function(df) {
         x[1, ]                      # earliest ploughed
         
       } else {
-        x[which.max(x$predicted_probability), ]  # strongest signal
+        x[which.max(x$predicted_probability), ]  # highest probability
       }
     })
     
@@ -105,7 +105,7 @@ is_valid_window <- function(seq, allowed_patterns) {
 # ------------------------------------------------------------
 # FINAL PIPELINE
 # ------------------------------------------------------------
-process_parcels <- function(df, window_days = 30) {
+process_parcels <- function(df, window_days = 25) {
   
   parcels <- split(df, df$parcel_id)
   results <- list()
@@ -138,13 +138,13 @@ process_parcels <- function(df, window_days = 30) {
     }
     
     # -----------------------------
-    # FINAL OUTPUT (IMPORTANT FIX)
+    # FINAL OUTPUT 
     # -----------------------------
     results[[pid]] <- data.frame(
       parcel_id = pid,
       glyphosate = ifelse(glyphosate, "yes", "no"),
       
-      # ✔ THIS is what you asked for:
+      
       avg_probability = mean(d$predicted_probability, na.rm = TRUE)
     )
   }
