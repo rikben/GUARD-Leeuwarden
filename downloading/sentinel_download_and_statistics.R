@@ -1,5 +1,3 @@
-
-
 required_packages <- c(
   "sf",
   "dplyr",
@@ -160,8 +158,8 @@ regularize_cube <- function(satellite_images) {
 
 # ─────────────────────────────────────────────
 # FUNCTION 3: Compute per-polygon band statistics
-#   - only pixels entirely within the polygon
-#   - only pixels classified as "clear" by the SCL cloud mask
+#    - only pixels entirely within the polygon
+#    - only pixels classified as "clear" by the SCL cloud mask
 # ─────────────────────────────────────────────
 
 compute_polygon_stats <- function(satellite_images_reg, my_polygons,
@@ -239,8 +237,8 @@ compute_polygon_stats <- function(satellite_images_reg, my_polygons,
 
 # ─────────────────────────────────────────────
 # FUNCTION 4: Extract and save RGB image patches per polygon per date
-#   - only pixels entirely within the polygon
-#   - only pixels classified as "clear" by the SCL cloud mask
+#    - only pixels entirely within the polygon
+#    - only pixels classified as "clear" by the SCL cloud mask
 # ─────────────────────────────────────────────
 
 extract_rgb_patches <- function(satellite_images_reg, my_polygons, base_img_dir,
@@ -438,7 +436,6 @@ generate_image_metadata <- function(satellite_images_reg, vector_file,
         ndvi_res$mean > 0.3   ~ "yellow",
         TRUE                  ~ "ploughed"
       )
-    
       
       # Mark as discarded if no valid (fully-covered, cloud-free) pixels exist for NDVI
       discarded_flag <- if (ndvi_res$n_valid == 0) "yes" else NA_character_
@@ -447,8 +444,8 @@ generate_image_metadata <- function(satellite_images_reg, vector_file,
         image_id              = paste0("IMG_", sprintf("%05d", image_id_counter)),
         parcel_id             = pid,
         image_date            = dt,
-        file_path             = file.path("data", paste0("plot_", pid),
-                                          paste0("RGB_", dt, ".tif")),
+        file_path             = file.path("data", paste0("images_", substr(dt, 1, 4)),
+                                          paste0("plot_", pid), paste0("RGB_", dt, ".tif")),
         ndvi_mean              = round(ndvi_res$mean, 4),
         ndvi_sd                = round(ndvi_res$sd,   4),
         ndre_mean              = round(ndre_res$mean, 4),
@@ -503,7 +500,7 @@ for (idx in seq_along(years)) {
   yr <- years[idx]
   
   input_vector_file <- parcel_files[idx]
-  base_img_dir       <- paste0("images_", yr)
+  base_img_dir       <- file.path("data", paste0("images_", yr))
   start_date         <- start_dates[idx]
   end_date           <- end_dates[idx]
   raw_data_dir       <- "data/raw-data"
@@ -535,7 +532,7 @@ for (idx in seq_along(years)) {
   # 5. Generate parcel metadata CSV
   parcel_metadata <- generate_parcel_metadata(
     input_vector_file,
-    file.path("metadata", paste0("parcel_metadata", yr, ".csv"))
+    file.path("data", "metadata", paste0("parcel_metadata", yr, ".csv"))
   )
   
   # 6. Generate image metadata CSV
@@ -543,7 +540,7 @@ for (idx in seq_along(years)) {
     satellite_images_reg,
     input_vector_file,
     polygon_summary_stats,
-    file.path("metadata", paste0("image_metadata", yr, ".csv"))
+    file.path("data", "metadata", paste0("image_metadata", yr, ".csv"))
   )
   
   cat("\nAll", yr, "operations complete!\n")
