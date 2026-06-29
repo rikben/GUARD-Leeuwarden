@@ -34,4 +34,10 @@ docs/       # Reports, presentations, and notes
 
 ## License
 
-To be determined.
+Copyright (C) 2026 Dirk Emaus, Nout Heine, Mathijs Keijzer, Jan Müldner, Rik Oudega
+
+This software is licensed under the GNU General Public License v3.0. See `LICENSE` for details.
+
+In addition, Sweco Group is granted a separate commercial license allowing internal use, modification, integration into proprietary software, and distribution without the copyleft obligations of the GPL.
+
+This commercial license applies only to the Sweco Group and its subsidiaries, unless otherwise agreed in writing.
