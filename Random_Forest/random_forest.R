@@ -3,6 +3,26 @@ library(ranger)
 library(caret)
 library(corrplot)
 
+required_packages <- c(
+  "dplyr",
+  "ranger",
+  "caret",
+  "corrplot"
+)
+
+install_if_missing <- function(pkg) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    message("Installing missing package: ", pkg)
+    install.packages(pkg, repos = "https://cloud.r-project.org")
+  }
+}
+
+invisible(lapply(required_packages, install_if_missing))
+invisible(lapply(required_packages, function(pkg) {
+  message("Loading package: ", pkg)
+  library(pkg, character.only = TRUE)
+}))
+
 # ─────────────────────────────────────────────
 # PREDICTOR COLUMNS
 #   Full set of candidate predictors. suggested_class_label is excluded
@@ -596,13 +616,24 @@ run_scenario <- function(scenario_name, data, candidate_cols,
 # ═════════════════════════════════════════════
 # MAIN WORKFLOW
 # ═════════════════════════════════════════════
+# ---- Settings ----
 
-image_csv_paths  <- c("../labeling/output/image_metadata2020_final.csv",
-                      "../labeling/output/image_metadata2025_final.csv")
-parcel_csv_paths <- c("../labeling/output/parcel_metadata2020_final.csv",
-                      "../labeling/output/parcel_metadata2025_final.csv")
-correlation_dir  <- "correlation"
-results_dir      <- "results"
+if (!exists("image_csv_paths")) {
+  image_csv_paths <- c(
+    "data/output/image_metadata2020_final.csv",
+    "data/output/image_metadata2025_final.csv"
+  )
+}
+
+if (!exists("parcel_csv_paths")) {
+  parcel_csv_paths <- c(
+    "data/output/parcel_metadata2020_final.csv",
+    "data/output/parcel_metadata2025_final.csv"
+  )
+}
+
+correlation_dir  <- "data/correlation"
+results_dir      <- "data/results"
 
 # ── Load all data ──────────────────────────────────────────────────────────────
 data_2020 <- prepare_training_data(image_csv_paths[1], parcel_csv_paths[1])
