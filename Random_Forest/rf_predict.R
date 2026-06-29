@@ -6,7 +6,6 @@
 
 library(readr)
 library(dplyr)
-library(here)
 
 out_dir <- "data"
 if (!dir.exists(out_dir)) {
@@ -16,7 +15,7 @@ if (!dir.exists(out_dir)) {
 # ------------------------------------------------------------
 # LOAD
 # ------------------------------------------------------------
-file_path <- here("downloading/results", "predictions_2026.csv")
+file_path <- "../downloading/results/predictions_2026.csv"
 
 df <- read_csv(file_path, show_col_types = FALSE) %>%
   select(parcel_id, image_date, predicted_class, predicted_probability) %>%
@@ -156,4 +155,5 @@ process_parcels <- function(df, window_days = 25) {
 # ------------------------------------------------------------
 final_results <- process_parcels(df_clean)
 
-write_csv(final_results, here("downloading/data", "parcel_predictions.csv"))
+output_path <- file.path("..", "downloading", "data", "parcel_predictions.csv")
+write_csv(final_results, output_path)
