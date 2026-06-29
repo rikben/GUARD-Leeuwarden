@@ -1,9 +1,21 @@
-library(sits)
-library(sf)
-library(httr2)
-library(tidyverse)
-library(terra)
-library(dplyr)
+
+
+required_packages <- c(
+  "sf",
+  "dplyr",
+  "sits",
+  "httr2",
+  "tidyverse",
+  "terra"
+)
+
+install_if_missing <- function(pkg) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    message("Installing missing package: ", pkg)
+    install.packages(pkg, repos = "https://cloud.r-project.org")
+  }
+}
+
 
 dir.create(file.path(getwd(), "tmp"), showWarnings = FALSE, recursive = TRUE)
 
@@ -478,8 +490,10 @@ generate_image_metadata <- function(satellite_images_reg, vector_file,
 # MAIN: Call all functions in order for each year
 # ═════════════════════════════════════════════
 
-years    <- c(2025)
-data_dir <- "../sampling/samples"
+if (!exists("years")) {
+  years <- c(2020, 2025)
+}
+data_dir <- "data/samples"
 
 parcel_files <- file.path(data_dir, paste0("sampled_parcels_", years, ".gpkg"))
 start_dates  <- paste0(years, "-03-01")

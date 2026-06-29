@@ -22,14 +22,29 @@ source("sampling/summarise_soils.R")
 # 4 waarneming observation
 
 # Choose the years for this run
-brp_years <- c(2020, 2025)
+years <- c(2020, 2025)
 
 source("sampling/waarneming_obs.R")
 
 # 5 points to parcels 
 
 # Choose the years for this run
-brp_years <- c(2020, 2025)
+years <- c(2020, 2025)
 
 source("sampling/points_to_parcels.R")
+
+# 6 Sample BRP parcels 
+
+years <- c(2020, 2025)
+grid_size <- 40000
+target_categories <- c("Grasland", "Bouwland")
+n_per_year_glyphosate <- c("0" = 100, "1" = 300)
+
+source("sampling/sample_brp_parcels.R")
+
+# 7 sentinel download 
+
+years <- c(2020, 2025)
+
+source("downloading/sentinel_download_and_statistics")
 

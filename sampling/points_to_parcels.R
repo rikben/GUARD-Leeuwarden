@@ -26,8 +26,8 @@ install_if_missing <- function(pkg) {
 }
 
 #user input
-if (!exists("brp_years")) {
-  brp_years <- c(2020, 2025)
+if (!exists("years")) {
+  years <- c(2020, 2025)
 }
 
 # Setup

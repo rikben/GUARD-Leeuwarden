@@ -1,25 +1,44 @@
 # sample_brp_parcels.R
 
-library(sf)
-library(dplyr)
-library(readr)
-library(stringr)
-library(purrr)
+required_packages <- c(
+  "sf",
+  "dplyr",
+  "readr",
+  "stringr",
+  "purrr"
+)
+
+install_if_missing <- function(pkg) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    message("Installing missing package: ", pkg)
+    install.packages(pkg, repos = "https://cloud.r-project.org")
+  }
+}
 
 # ---- Settings ----
 
 data_dir <- "data"
-out_dir  <- "samples"
+out_dir  <- "data/samples"
 
-years <- c(2020, 2025)
-grid_size <- 40000
-target_categories <- c("Bouwland", "Grasland")
+if (!exists("years")) {
+  years <- c(2020, 2025)
+}
+
+if (!exists("grid_size")) {
+  grid_size <- 40000
+}
+
+if (!exists("target_categories")) {
+  target_categories <- c("Bouwland", "Grasland")
+}
 
 # Number of samples per glyphosate class per year
-n_per_year_glyphosate <- c(
-  "0" = 100,  # non-glyphosate parcels per year
-  "1" = 300   # glyphosate parcels per year
-)
+if (!exists("n_per_year_glyphosate")) {
+  n_per_year_glyphosate <- c(
+    "0" = 100,  # non-glyphosate parcels per year
+    "1" = 300   # glyphosate parcels per year
+  )
+}
 
 out_summary_csv <- file.path(out_dir, "sample_summary.csv")
 out_concise_summary_csv <- file.path(out_dir, "sample_summary_concise.csv")
