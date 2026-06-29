@@ -3,11 +3,13 @@ library(dplyr)
 library(readr)
 library(DT)
 
-year <- "2020"
+if (!exists("years")) {
+  years <- "2020"
+}
 
-parcel_csv <- paste0("../downloading/metadata/parcel_metadata",year,".csv")
-image_csv  <- paste0("../downloading/metadata/image_metadata",year,".csv")
-image_root <- paste0("../downloading/images_",year)
+parcel_csv <- paste0("data/metadata/parcel_metadata",year,".csv")
+image_csv  <- paste0("data/metadata/image_metadata",year,".csv")
+image_root <- paste0("data/images_",year)
 
 addResourcePath("plot_images", normalizePath(image_root))
 
