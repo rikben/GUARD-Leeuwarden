@@ -13,6 +13,12 @@ install_if_missing <- function(pkg) {
   }
 }
 
+invisible(lapply(required_packages, install_if_missing))
+invisible(lapply(required_packages, function(pkg) {
+  message("Loading package: ", pkg)
+  library(pkg, character.only = TRUE)
+}))
+
 # ---- Settings ----
 
 data_dir <- "data"

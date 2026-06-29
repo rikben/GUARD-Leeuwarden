@@ -1,7 +1,22 @@
-library(shiny)
-library(dplyr)
-library(readr)
-library(DT)
+required_packages <- c(
+  "shiny",
+  "dplyr",
+  "readr",
+  "DT"
+)
+
+install_if_missing <- function(pkg) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    message("Installing missing package: ", pkg)
+    install.packages(pkg, repos = "https://cloud.r-project.org")
+  }
+}
+
+invisible(lapply(required_packages, install_if_missing))
+invisible(lapply(required_packages, function(pkg) {
+  message("Loading package: ", pkg)
+  library(pkg, character.only = TRUE)
+}))
 
 if (!exists("years")) {
   years <- "2020"

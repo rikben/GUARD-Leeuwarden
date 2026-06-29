@@ -25,6 +25,12 @@ install_if_missing <- function(pkg) {
   }
 }
 
+invisible(lapply(required_packages, install_if_missing))
+invisible(lapply(required_packages, function(pkg) {
+  message("Loading package: ", pkg)
+  library(pkg, character.only = TRUE)
+}))
+
 #user input
 if (!exists("years")) {
   years <- c(2020, 2025)

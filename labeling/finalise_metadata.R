@@ -1,13 +1,28 @@
 # finalise_metadata.R
 
-library(dplyr)
-library(readr)
-library(stringr)
-library(purrr)
-library(tidyr)
+required_packages <- c(
+  "readr",
+  "dplyr",
+  "stringr",
+  "purrr",
+  "tidyr"
+)
 
-metadata_dir <- "../downloading/metadata"
-out_dir <- "output"
+install_if_missing <- function(pkg) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    message("Installing missing package: ", pkg)
+    install.packages(pkg, repos = "https://cloud.r-project.org")
+  }
+}
+
+invisible(lapply(required_packages, install_if_missing))
+invisible(lapply(required_packages, function(pkg) {
+  message("Loading package: ", pkg)
+  library(pkg, character.only = TRUE)
+}))
+
+metadata_dir <- "data/metadata"
+out_dir <- "data/output"
 
 if (!dir.exists(out_dir)) {
   dir.create(out_dir, recursive = TRUE)
