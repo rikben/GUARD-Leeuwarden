@@ -1,11 +1,25 @@
 # create_country_grid.R
 
-library(sf)
-library(dplyr)
+required_packages <- c(
+  "sf",
+  "dplyr"
+)
+
+install_if_missing <- function(pkg) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    message("Installing missing package: ", pkg)
+    install.packages(pkg, repos = "https://cloud.r-project.org")
+  }
+}
 
 # ---- Settings ----
-grid_size_m <- 40000
-min_area_fraction <- 0.25
+if (!exists("grid_size_m")) {
+  grid_size_m <- 40000
+}
+
+if (!exists("min_area_fraction")) {
+  min_area_fraction <- 0.25
+}
 
 out_dir <- "data"
 out_file <- file.path(out_dir, paste0("nl_grid_", grid_size_m, "m.geojson"))

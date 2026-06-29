@@ -13,11 +13,22 @@
 # assumes all parcels and observations files are in "data" dir, if not, we need some function here that sources those
 # from the other scripts (which are Waarnemingen_obs_download.R and prepare_soil_brp.R)
 
-library(sf)
-library(dplyr)
+required_packages <- c(
+  "sf",
+  "dplyr"
+)
+
+install_if_missing <- function(pkg) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    message("Installing missing package: ", pkg)
+    install.packages(pkg, repos = "https://cloud.r-project.org")
+  }
+}
 
 #user input
-years <- c(2020, 2025)
+if (!exists("brp_years")) {
+  brp_years <- c(2020, 2025)
+}
 
 # Setup
 out_dir <- "data"

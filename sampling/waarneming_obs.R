@@ -5,13 +5,24 @@
 # PACKAGES #
 #install.packages("httr2")
 
-library(sf)
-library(httr2)
-library(jsonlite)
+required_packages <- c(
+  "sf",
+  "httr2",
+  "jsonlite"
+)
+
+install_if_missing <- function(pkg) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    message("Installing missing package: ", pkg)
+    install.packages(pkg, repos = "https://cloud.r-project.org")
+  }
+}
 
 # SETUP #
 out_dir <- "data"
-years <- c("2020", "2025")
+if (!exists("brp_years")) {
+  brp_years <- c(2020, 2025)
+}
 
 if (!dir.exists(out_dir)) {
   dir.create(out_dir, recursive = TRUE)

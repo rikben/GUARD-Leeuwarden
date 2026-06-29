@@ -1,9 +1,18 @@
 # prepare_soil_brp_grid_parallel.R
 
-library(sf)
-library(dplyr)
-library(foreach)
-library(doParallel)
+required_packages <- c(
+  "sf",
+  "dplyr",
+  "foreach",
+  "doParallel"
+)
+
+install_if_missing <- function(pkg) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    message("Installing missing package: ", pkg)
+    install.packages(pkg, repos = "https://cloud.r-project.org")
+  }
+}
 
 # ---- Settings ----
 out_dir <- "data"
@@ -11,7 +20,9 @@ out_dir <- "data"
 soil_gpkg <- file.path(out_dir, "BRO_DownloadBodemkaart.gpkg")
 soil_url <- "https://service.pdok.nl/tno/bro-bodemkaart/atom/downloads/BRO_DownloadBodemkaart.gpkg"
 
-brp_years <- c(2020, 2025)
+if (!exists("brp_years")) {
+  brp_years <- c(2020, 2025)
+}
 
 brp_url_template <- "https://service.pdok.nl/rvo/gewaspercelen/atom/downloads/brpgewaspercelen_definitief_%s.gpkg"
 

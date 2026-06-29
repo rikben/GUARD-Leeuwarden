@@ -1,13 +1,24 @@
 # summarise_soils.R
 
-library(sf)
-library(dplyr)
-library(stringr)
+required_packages <- c(
+  "sf",
+  "dplyr",
+  "stringr"
+)
+
+install_if_missing <- function(pkg) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    message("Installing missing package: ", pkg)
+    install.packages(pkg, repos = "https://cloud.r-project.org")
+  }
+}
 
 # ---- Settings ----
 
 data_dir <- "data"
-brp_years <- c(2020, 2025)
+if (!exists("brp_years")) {
+  brp_years <- c(2020, 2025)
+}
 
 # ---- Process each year ----
 
