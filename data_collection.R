@@ -46,5 +46,5 @@ source("sampling/sample_brp_parcels.R")
 
 years <- c(2020, 2025)
 
-source("downloading/sentinel_download_and_statistics")
+source("downloading/sentinel_download_and_statistics.R")
 
