@@ -1,6 +1,6 @@
 # 1 grid
 
-grid_size_m <- 30000
+grid_size_m <- 40000
 min_area_fraction <- 0.25
 
 source("sampling/create_country_grid.R")
