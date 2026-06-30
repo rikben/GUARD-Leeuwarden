@@ -1,11 +1,11 @@
 source("downloading/results_download.R")
-source("Random_Forest/random_forest_predict.R")
+source("random_forest/random_forest_predict.R")
 source("detection_algorithm/pattern_recognition.R")
 
 yr <- 2026
 
 # replace this with your own geopackage if you want to get results for a different area
-input_vector_file <- file.path("Random_Forest/leeuwarden_brp_parcels.gpkg")
+input_vector_file <- file.path("random_forest/leeuwarden_brp_parcels.gpkg")
 
 # 1. Download imagery / regularize / extract metadata
 image_metadata <- run_data_pipeline(yr, input_vector_file)
@@ -14,7 +14,7 @@ image_metadata <- run_data_pipeline(yr, input_vector_file)
 # if you want to use a newly trained model just remove the model path
 # it wil default to the all years combined scenario
 final_predictions <- run_rf_prediction(image_metadata, yr,
-                                       model_path = "Random_Forest/rf_model.rds")
+                                       model_path = "random_forest/rf_model.rds")
 
 if (!is.null(final_predictions)) {
   
