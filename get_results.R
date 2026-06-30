@@ -1,6 +1,6 @@
 source("downloading/results_download.R")
 source("downloading/random_forest_predict.R")
-source("Random_Forest/rf_predict.R")
+source("detection_algorithm/pattern_recognition.R")
 
 yr <- 2026
 input_vector_file <- file.path("Leeuwarden.gpkg")
