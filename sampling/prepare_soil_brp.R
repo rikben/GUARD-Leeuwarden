@@ -85,6 +85,12 @@ get_total_ram_gb <- function() {
     meminfo <- readLines("/proc/meminfo")
     mem_kb <- as.numeric(sub(".*:\\s+([0-9]+)\\s+kB", "\\1", meminfo[grepl("^MemTotal:", meminfo)]))
     return(mem_kb / 1024^2)
+  } else if (.Platform$OS.type == "windows") {
+    mem_bytes <- tryCatch({
+      out <- system2("powershell", c("-Command", "(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory"), stdout = TRUE)
+      as.numeric(trimws(out))
+    }, error = function(e) NA_real_)
+    if (!is.na(mem_bytes)) return(mem_bytes / 1024^3)
   }
   NA_real_
 }
@@ -315,13 +321,19 @@ for (year in brp_years) {
     
     message("Starting parallel tile processing...")
     
-    # On Ubuntu/Linux, FORK is usually more memory efficient than PSOCK
-    cl <- parallel::makeForkCluster(workers)
+    # Dynamic cluster type allocation based on OS
+    if (.Platform$OS.type == "windows") {
+      cl <- parallel::makeCluster(workers)
+    } else {
+      cl <- parallel::makeForkCluster(workers)
+    }
     doParallel::registerDoParallel(cl)
     
+    # Windows background sessions require explicit variable/function exports
     tile_results <- foreach(
       tile_id = seq_len(nrow(grid)),
       .packages = c("sf", "dplyr"),
+      .export = c("process_tile", "grid", "brp", "soil_classes"),
       .errorhandling = "pass"
     ) %dopar% {
       process_tile(tile_id, grid, brp, soil_classes)

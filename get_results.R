@@ -1,17 +1,16 @@
 source("downloading/results_download.R")
-source("downloading/random_forest_predict.R")
+source("Random_Forest/random_forest_predict.R")
 source("detection_algorithm/pattern_recognition.R")
 
 yr <- 2026
-input_vector_file <- file.path("Leeuwarden.gpkg")
+input_vector_file <- file.path("Random_Forest/leeuwarden_brp_parcels.gpkg")
 
 # 1. Download imagery / regularize / extract metadata
 image_metadata <- run_data_pipeline(yr, input_vector_file)
 
 # 2. Apply trained ranger RF model 
-# change model_path!!!!!!!!!!!!!!!!!!!!!!!!
 final_predictions <- run_rf_prediction(image_metadata, yr,
-                                       model_path = "data/results/rf_model_scenario3_both.rds")
+                                       model_path = "Random_Forest/rf_model.rds")
 
 if (!is.null(final_predictions)) {
   
