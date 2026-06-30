@@ -1,11 +1,4 @@
-image_csv_paths <- c(
-  "data/output/image_metadata2020_final.csv",
-  "data/output/image_metadata2025_final.csv"
-)
 
-parcel_csv_paths <- c(
-  "data/output/parcel_metadata2020_final.csv",
-  "data/output/parcel_metadata2025_final.csv"
-)
+years <- c(2020, 2025)
 
 source("Random_Forest/random_forest.R")

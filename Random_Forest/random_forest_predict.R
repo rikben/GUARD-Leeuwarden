@@ -22,7 +22,7 @@ invisible(lapply(required_packages, function(pkg) {
 # ─────────────────────────────────────────────
 
 run_rf_prediction <- function(image_metadata, yr,
-                              model_path = "data/results/rf_model_scenario3_both.rds") {
+                              model_path = "data/results/scenario_all_years_combined_final_model.rds") {
   cat("\n===== 2. Applying Ranger Random Forest Model =====\n")
   
   if (!file.exists(model_path)) {

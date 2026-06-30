@@ -618,27 +618,28 @@ run_scenario <- function(scenario_name, data, candidate_cols,
 # ═════════════════════════════════════════════
 # ---- Settings ----
 
-if (!exists("image_csv_paths")) {
-  image_csv_paths <- c(
-    "data/output/image_metadata2020_final.csv",
-    "data/output/image_metadata2025_final.csv"
-  )
+if (!exists("years")) {
+  years <- c(2020, 2025)
 }
 
-if (!exists("parcel_csv_paths")) {
-  parcel_csv_paths <- c(
-    "data/output/parcel_metadata2020_final.csv",
-    "data/output/parcel_metadata2025_final.csv"
-  )
-}
+data_dir <- "data/samples"
+
+image_csv_paths  <- file.path(data_dir, paste0("image_metadata", years, "_final.csv"))
+parcel_csv_paths <- file.path(data_dir, paste0("parcel_metadata", years, "_final.csv"))
 
 correlation_dir  <- "data/correlation"
 results_dir      <- "data/results"
 
 # ── Load all data ──────────────────────────────────────────────────────────────
-data_2020 <- prepare_training_data(image_csv_paths[1], parcel_csv_paths[1])
-data_2025 <- prepare_training_data(image_csv_paths[2], parcel_csv_paths[2])
-data_both <- bind_rows(data_2020, data_2025) %>%
+# data_by_year[[as.character(year)]] holds that year's prepared training data
+data_by_year <- setNames(
+  lapply(seq_along(years), function(i) {
+    prepare_training_data(image_csv_paths[i], parcel_csv_paths[i])
+  }),
+  as.character(years)
+)
+
+data_both <- bind_rows(data_by_year) %>%
   mutate(class_label = as.factor(class_label))
 
 # ── Correlation plots (exploratory only — not used for feature selection) ──────
@@ -650,75 +651,91 @@ plot_correlation(data_both, ALL_PREDICTOR_COLS, type = "bands",
 plot_correlation(data_both, ALL_PREDICTOR_COLS, type = "indices",
                  output_path = file.path(correlation_dir, "corr_indices.png"))
 
-# ── Scenario 1: 2020 only ─────────────────────────────────────────────────────
-results_s1 <- run_scenario("scenario1_2020only",
-                           data           = data_2020,
-                           candidate_cols = ALL_PREDICTOR_COLS,
-                           output_dir     = results_dir)
-
-# ── Scenario 2: 2025 only ─────────────────────────────────────────────────────
-results_s2 <- run_scenario("scenario2_2025only",
-                           data           = data_2025,
-                           candidate_cols = ALL_PREDICTOR_COLS,
-                           output_dir     = results_dir)
-
-# ── Scenario 3: both years combined ───────────────────────────────────────────
-results_s3 <- run_scenario("scenario3_both",
-                           data           = data_both,
-                           candidate_cols = ALL_PREDICTOR_COLS,
-                           output_dir     = results_dir)
-
-# ── Scenario 4: train on 2020, evaluate on 2025 ───────────────────────────────
-# This scenario is fundamentally a temporal transfer test, not a standard CV
-# scenario. CV still runs on data_2020 (for model selection and evaluation),
-# but we also do a separate held-out evaluation on the full data_2025 set
-# using the final model — the only legitimate use of an explicit holdout here,
-# because the year boundary is a meaningful external test of generalisation.
-results_s4 <- run_scenario("scenario4_train2020_cv",
-                           data           = data_2020,
-                           candidate_cols = ALL_PREDICTOR_COLS,
-                           output_dir     = results_dir)
-
-# Apply the scenario 4 final model to 2025 as a temporal holdout evaluation
-cat("\n── Scenario 4: temporal transfer evaluation (2025 as external test set) ──\n")
-s4_majority_feats <- results_s4$cv_outputs$imp_summary$feature[
-  results_s4$cv_outputs$imp_summary$majority_selected
-]
-s4_missing <- setdiff(s4_majority_feats, names(data_2025))
-if (length(s4_missing) > 0)
-  warning("Columns missing in 2025 data: ", paste(s4_missing, collapse = ", "))
-
-s4_test_pred_data <- data_2025 %>%
-  select(all_of(intersect(s4_majority_feats, names(data_2025))))
-s4_prob_matrix    <- predict(results_s4$final_model, data = s4_test_pred_data)$predictions
-s4_pred_classes   <- factor(
-  colnames(s4_prob_matrix)[apply(s4_prob_matrix, 1, which.max)],
-  levels = levels(data_both$class_label)
-)
-s4_true_classes   <- factor(data_2025$class_label, levels = levels(data_both$class_label))
-s4_pred_probs     <- apply(s4_prob_matrix, 1, max)
-
-s4_cm  <- caret::confusionMatrix(s4_pred_classes, s4_true_classes)
-s4_acc <- s4_cm$overall["Accuracy"]
-cat("Scenario 4 temporal transfer accuracy (2025):", round(s4_acc * 100, 2), "%\n")
-
-# Save temporal transfer predictions
-s4_transfer_df <- data_2025 %>%
-  select(group_id, parcel_id, image_date) %>%
-  mutate(
-    true_class      = as.character(s4_true_classes),
-    predicted_class = as.character(s4_pred_classes),
-    predicted_prob  = round(s4_pred_probs, 4),
-    correct         = s4_pred_classes == s4_true_classes
+# ── Per-year scenarios: one scenario per year in `years` ──────────────────────
+results_by_year <- list()
+for (yr in years) {
+  scenario_name <- paste0("scenario_", yr, "only")
+  results_by_year[[as.character(yr)]] <- run_scenario(
+    scenario_name,
+    data           = data_by_year[[as.character(yr)]],
+    candidate_cols = ALL_PREDICTOR_COLS,
+    output_dir     = results_dir
   )
-write.csv(s4_transfer_df,
-          file.path(results_dir, "scenario4_temporal_transfer_predictions.csv"),
-          row.names = FALSE)
+}
 
-sink(file.path(results_dir, "scenario4_temporal_transfer_confusion.txt"))
-cat("=== Scenario 4: Temporal Transfer (train=2020, test=2025) ===\n\n")
-cat("Accuracy:", round(s4_acc * 100, 2), "%\n\n")
-print(s4_cm$table)
-sink()
+# ── Combined scenario: all years together ──────────────────────────────────────
+results_combined <- run_scenario("scenario_all_years_combined",
+                                 data           = data_both,
+                                 candidate_cols = ALL_PREDICTOR_COLS,
+                                 output_dir     = results_dir)
+
+# ── Temporal transfer scenario: train on first year, evaluate on last year ────
+# Only meaningful when exactly 2 years are supplied — the year boundary is then
+# unambiguous and represents a genuine external generalisation test. With more
+# than 2 years, "train on first / test on last" is no longer well-defined, so
+# this scenario is skipped.
+if (length(years) == 2) {
+  
+  train_year <- years[1]
+  test_year  <- years[2]
+  
+  data_train <- data_by_year[[as.character(train_year)]]
+  data_test  <- data_by_year[[as.character(test_year)]]
+  
+  scenario_name <- paste0("scenario_train", train_year, "_cv")
+  results_transfer <- run_scenario(scenario_name,
+                                   data           = data_train,
+                                   candidate_cols = ALL_PREDICTOR_COLS,
+                                   output_dir     = results_dir)
+  
+  # Apply the final model to the held-out year as a temporal holdout evaluation
+  cat("\n── Temporal transfer evaluation (", test_year,
+      "as external test set) ──\n")
+  
+  majority_feats <- results_transfer$cv_outputs$imp_summary$feature[
+    results_transfer$cv_outputs$imp_summary$majority_selected
+  ]
+  missing_cols <- setdiff(majority_feats, names(data_test))
+  if (length(missing_cols) > 0)
+    warning("Columns missing in ", test_year, " data: ", paste(missing_cols, collapse = ", "))
+  
+  test_pred_data <- data_test %>%
+    select(all_of(intersect(majority_feats, names(data_test))))
+  prob_matrix    <- predict(results_transfer$final_model, data = test_pred_data)$predictions
+  pred_classes   <- factor(
+    colnames(prob_matrix)[apply(prob_matrix, 1, which.max)],
+    levels = levels(data_both$class_label)
+  )
+  true_classes <- factor(data_test$class_label, levels = levels(data_both$class_label))
+  pred_probs   <- apply(prob_matrix, 1, max)
+  
+  transfer_cm  <- caret::confusionMatrix(pred_classes, true_classes)
+  transfer_acc <- transfer_cm$overall["Accuracy"]
+  cat("Temporal transfer accuracy (", test_year, "):",
+      round(transfer_acc * 100, 2), "%\n")
+  
+  # Save temporal transfer predictions
+  transfer_df <- data_test %>%
+    select(group_id, parcel_id, image_date) %>%
+    mutate(
+      true_class      = as.character(true_classes),
+      predicted_class = as.character(pred_classes),
+      predicted_prob  = round(pred_probs, 4),
+      correct         = pred_classes == true_classes
+    )
+  write.csv(transfer_df,
+            file.path(results_dir, paste0(scenario_name, "_temporal_transfer_predictions.csv")),
+            row.names = FALSE)
+  
+  sink(file.path(results_dir, paste0(scenario_name, "_temporal_transfer_confusion.txt")))
+  cat("=== Temporal Transfer (train=", train_year, ", test=", test_year, ") ===\n\n")
+  cat("Accuracy:", round(transfer_acc * 100, 2), "%\n\n")
+  print(transfer_cm$table)
+  sink()
+  
+} else {
+  cat("\nSkipping temporal transfer scenario: requires exactly 2 years (got",
+      length(years), ").\n")
+}
 
 cat("\n===== All scenarios complete =====\n")
