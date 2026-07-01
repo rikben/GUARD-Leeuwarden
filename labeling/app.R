@@ -18,8 +18,8 @@ invisible(lapply(required_packages, function(pkg) {
   library(pkg, character.only = TRUE)
 }))
 
-if (!exists("years")) {
-  years <- "2020"
+if (!exists("year")) {
+  year <- "2020"
 }
 
 parcel_csv <- paste0("data/metadata/parcel_metadata",year,".csv")
